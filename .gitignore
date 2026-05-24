@@ -1,0 +1,44 @@
+# ft_ping - ignored files
+
+# C compilation artifacts
+*.o
+*.d
+*.a
+*.so
+*.so.*
+*.dylib
+*.gch
+*.pch
+
+# Out-of-source build directories
+obj/
+build/
+bin/
+
+# Executable (extensionless binary - anchored at root,
+# so a future src/ft_ping.c is never masked)
+/ft_ping
+*.dSYM/
+
+# Coverage & profiling (gcov / sanitizers)
+*.gcno
+*.gcda
+*.gcov
+*.profraw
+*.profdata
+coverage/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+compile_commands.json
+
+# Local working space (working docs: methodology, roadmap, subject, PDF)
+docs/
+
+# (Test artifacts — Criterion binary, reports — will be added later)
