@@ -28,6 +28,12 @@ bin/
 *.profdata
 coverage/
 
+# Provisioning / VM (Ansible retry files; the ISO and disk normally live
+# outside the repo via FTPING_VM_DIR, ignored here only as a safety net)
+*.retry
+*.iso
+*.vdi
+
 # Editors / OS
 .vscode/
 .idea/
