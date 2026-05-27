@@ -1,0 +1,18 @@
+---
+# Provisions the ft_ping development toolchain (local machine OR VM).
+# hosts: all -> matches 'localhost' (local bootstrap) as well as the SSH host (create-vm).
+- name: Provision ft_ping development toolchain
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Refresh apt cache when older than one hour
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install pinned development toolchain
+      ansible.builtin.apt:
+        name: "{{ ftping_packages }}"
+        state: present

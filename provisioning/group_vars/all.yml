@@ -1,0 +1,14 @@
+---
+# ft_ping toolchain, pinned by VERSIONED NAME (portable Ubuntu 24.04 <-> Debian trixie).
+# We pin the *major* (gcc-13, clang-format-19), not the exact apt version
+# (which differs across distros): 'state: present', never 'latest'.
+ftping_packages:
+  - gcc-13          # target compiler (>= 13: -Wanalyzer-fd-* checks)
+  - make
+  - clang-format-19 # formatting (pinned major -> identical output on both sides)
+  - clang-tidy-19   # static analysis (Clang)
+  - cppcheck        # static analysis (independent engine)
+  - valgrind        # runtime memory analysis
+  - gcovr           # coverage (structure laid down in the test harness)
+  - bear            # generates compile_commands.json
+  - ansible-lint    # lints the playbook itself

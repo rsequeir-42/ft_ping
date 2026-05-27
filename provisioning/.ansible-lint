@@ -1,0 +1,5 @@
+---
+# Quality of the playbook itself (cf. clang-tidy/cppcheck on the C side).
+profile: production
+exclude_paths:
+  - .git/
