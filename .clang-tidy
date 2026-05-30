@@ -1,0 +1,20 @@
+# clang-tidyy configuration for ft_ping.
+# Wide families enabled; a few checks excluded because they don't fit low-level C
+# (ICMP type constants are not "magic numbers", short names like fd/n/i are clear
+# in context, and easily-swappable-parameters is noisy on C signatures).
+
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -bugprone-easily-swappable-parameters
+
+WarningsAsErrors:   '*'
+HeaderFilterRegex:  '^(src|include)/.*\.h$'
+FormatStyle:        file

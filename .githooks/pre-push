@@ -1,0 +1,5 @@
+#!/bin/sh
+# pre-push: run the full quality gate before anything leaves the machine.
+# Bypassable with 'git push --no-verify'; CI is the real gate.
+echo ">>> pre-push: make check"
+exec make check

@@ -9,7 +9,7 @@ INCDIR		:= include
 # Sources listed explicitly (no wildcard: an unlisted file is a deliberate signal).
 SRC			:= main.c
 
-# Build profile: release (default) or debug. Use: make MODE=debug (or: make debug)
+# Build profile: release (default), debug or coverage. Use: make MODE=debug
 MODE		?= release
 
 # Preprocessor: include path + automatic header dependencies.
@@ -31,8 +31,12 @@ ifeq ($(MODE),debug)
 else ifeq ($(MODE),release)
 	OBJDIR	:= obj/release
 	CFLAGS	+= -O2 -DNDEBUG
+else ifeq ($(MODE),coverage)
+	OBJDIR	:= obj/coverage
+	CFLAGS	+= -O0 -g --coverage -fprofile-abs-path
+	LDFLAGS	+= --coverage
 else
-	$(error unknown MODE '$(MODE)' (use 'release' or 'debug'))
+	$(error unknown MODE '$(MODE)' (use 'release', 'debug' or 'coverage'))
 endif
 
 OBJ			:= $(SRC:%.c=$(OBJDIR)/%.o)
@@ -41,6 +45,19 @@ DEP			:= $(OBJ:.o=.d)
 # Quality tools the make targets rely on (format/lint/analyze/memcheck/coverage).
 # Versioned names make the major version implicit (gcc-13, clang-format-19...).
 QUALITY_TOOLS := gcc-13 clang-format-19 clang-tidy-19 cppcheck valgrind gcovr bear
+
+# Quality tool executables, pinned to match the toolchain the playbook installs.
+# Override on the command line if needed, e.g. make CLANG_FORMAT=clang-format-18.
+CLANG_FORMAT	?= clang-format-19
+CLANG_TIDY		?= clang-tidy-19
+CPPCHECK		?= cppcheck
+VALGRIND		?= valgrind
+ANALYZER_CC		?= gcc-13
+GCOV			?= gcov-13
+
+# Files for the quality targets: every source+header for formatting; the
+# compiled translation units for clang-tidy (headers covered via HeaderFilterRegex).
+FORMAT_FILES	:= $(shell find $(SRCDIR) $(INCDIR) \( -name '*.c' -o -name '*.h' \) 2>/dev/null)
 
 all: $(NAME)
 
@@ -90,8 +107,8 @@ lint-playbook:
 	cd provisioning && PATH=/usr/bin:$$PATH ansible-lint
 
 # Preflight: READ-ONLY check that the quality tools are present (no install, no
-# sudo). Fails with a clear message if one is missing. Will gate the quality
-# targets later; never a prerequisite of 'all'.
+# sudo). Fails with a clear message if one is missing. Prerequisite of 'check';
+# never a prerequisite of 'all'.
 check-env:
 	@missing=0; \
 	for t in $(QUALITY_TOOLS); do \
@@ -102,6 +119,73 @@ check-env:
 	fi; \
 	echo "check-env: all quality tools present."
 
+# --- Formatting --------------------------------------------------------------
+# format applies in place; format-check only verifies (pre-commit hook, 'check').
+format:
+	$(CLANG_FORMAT) -i $(FORMAT_FILES)
+
+format-check:
+	$(CLANG_FORMAT) --dry-run --Werror $(FORMAT_FILES)
+
+# --- Static analysis (lint) --------------------------------------------------
+# clang-tidy needs a compilation database (exact flags per file). Bear records it
+# by observing a real build; regenerated whenever the Makefile changes.
+compile_commands.json: Makefile
+	$(MAKE) fclean
+	bear -- $(MAKE) MODE=debug
+
+compile-db: compile_commands.json
+
+# clang-tidy on the compiled translation units (headers via HeaderFilterRegex).
+tidy: compile_commands.json
+	$(CLANG_TIDY) -p . $(addprefix $(SRCDIR)/,$(SRC))
+
+# cppcheck: an independent engine, complements clang-tidy.
+cppcheck:
+	$(CPPCHECK) --enable=warning,style,performance,portability --std=c11 \
+		--language=c --error-exitcode=1 --inline-suppr -I$(INCDIR) $(SRCDIR)
+
+lint: tidy cppcheck
+
+# --- Deeper analysis (kept out of 'check': slower / privileged) --------------
+# GCC's analyzer. -fsyntax-only runs it without emitting objects, so it scales
+# to several files. Strict: analyzer warnings are errors via CFLAGS (-Werror).
+analyze:
+	$(ANALYZER_CC) -I$(INCDIR) $(CFLAGS) -fanalyzer -fsyntax-only \
+		$(addprefix $(SRCDIR)/,$(SRC))
+
+# valgrind: catches what ASan does not (uninitialised reads). On a binary
+# WITHOUT capabilities -- valgrind refuses a setcap'd executable.
+memcheck: $(NAME)
+	$(VALGRIND) --leak-check=full --error-exitcode=42 \
+		--errors-for-leak-kinds=definite,possible ./$(NAME)
+
+# Coverage: structure only; the measurement is wired at the test-harness sprint
+# (a .gcda written under sudo would be root-owned, so coverage runs on the
+# unit tests, not the privileged binary). GCOV is pinned to match gcc-13.
+coverage:
+	@echo "coverage: no tests yet -- deferred to the test-harness sprint ($(GCOV))"
+	@true
+
+# --- Placeholders wired into 'check' now, filled at the test-harness sprint --
+test:
+	@echo "test: no unit tests yet -- deferred to the test-harness sprint"
+	@true
+
+run-asan:
+	@echo "run-asan: nothing runnable yet -- deferred to the test-harness sprint"
+	@true
+
+# --- Single gate + hook activation -------------------------------------------
+# One door, run identically locally and (later) in CI. Fail-fast, left to right.
+check: check-env format-check lint debug test run-asan
+
+# Activate the versioned git hooks (run once after clone).
+hooks:
+	git config core.hooksPath .githooks
+
 -include $(DEP)
 
-.PHONY: all debug release clean fclean re bootstrap lint-playbook check-env
+.PHONY: all debug release clean fclean re bootstrap vm lint-playbook check-env \
+		format format-check compile-db tidy cppcheck lint analyze memcheck \
+		coverage test run-asan check hooks

@@ -1,0 +1,21 @@
+# clang-format configuration for ft_ping.
+# Base: LLVM; overrides reflect K&R C with 4-space indent and a 100-column budget.
+
+Language:           Cpp
+BasedOnStyle:       LLVM
+IndentWidth:        4
+UseTab:             Never
+BreakBeforeBraces:  Attach
+ColumnLimit:        100
+PointerAlignment:   Right
+# Keep function bodies on their own lines (LLVM defaults to packing short ones).
+AllowShortFunctionsOnASingleLine: None
+# Enforce a final newline, matching .editorconfig (LLVM does not by default).
+InsertNewlineAtEOF: true
+IncludeBlocks:      Regroup
+SortIncludes:       CaseSensitive
+IncludeCategories:
+    - Regex:        '^<.*>'
+      Priority:     2
+    - Regex:        '^".*"'
+      Priority:     3
