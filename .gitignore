@@ -20,13 +20,14 @@ bin/
 /ft_ping
 *.dSYM/
 
-# Coverage & profiling (gcov / sanitizers)
+# Coverage & profiling (gcov / sanitizers); gcovr reports
 *.gcno
 *.gcda
 *.gcov
 *.profraw
 *.profdata
 coverage/
+coverage.xml
 
 # Provisioning / VM (Ansible retry files; the ISO and disk normally live
 # outside the repo via FTPING_VM_DIR, ignored here only as a safety net)

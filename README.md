@@ -38,6 +38,22 @@ make lint-playbook # lint the Ansible provisioning
 - The ISO and the disk live **outside** the repository, under `FTPING_VM_DIR` (default `~/.cache/ftping-vm`; on a 42 workstation, set it to `~/goinfre/...`). The VM is disposable: rerun `make vm` to rebuild it from scratch.
 - Tunable via environment variables: `FTPING_VM_DIR`, `FTPING_VM_NAME`, `FTPING_VM_RAM`, `FTPING_VM_CPUS`, `FTPING_VM_DISK`, `FTPING_VM_SSH_PORT`, `FTPING_VM_USER`, `FTPING_VM_MIRROR`.
 
+## Quality tooling
+
+Formatting, static analysis and runtime checks, orchestrated by one gate. The tools are installed by `make bootstrap` / `make vm`.
+
+```sh
+make format        # apply clang-format in place
+make format-check  # verify formatting only (used by the hook and by check)
+make lint          # clang-tidy + cppcheck
+make analyze       # gcc -fanalyzer (deeper, slower; run on demand, not in check)
+make memcheck      # valgrind on the binary (run on demand, not in check)
+make coverage      # structure only; measurement deferred to the test-harness sprint
+make check         # the gate: check-env + format-check + lint + build + tests
+```
+
+The git hooks in `.githooks/` are versioned. **Run `make hooks` once after cloning** to activate them via `core.hooksPath`: `pre-commit` verifies formatting and lints staged C sources, `pre-push` runs `make check`. Both are bypassable with `--no-verify`; CI is the real gate.
+
 ## Academic integrity
 
 > This repository is a 42 school project, published as a portfolio piece. It is shared to be read and studied, not copied. If you follow the 42 cursus (or a similar one), copying this solution violates your school's integrity rules and deprives you of the learning; submissions are screened for plagiarism. Take inspiration from the approach, but write your own code.
