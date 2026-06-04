@@ -54,6 +54,26 @@ make check         # the gate: check-env + format-check + lint + build + tests
 
 The git hooks in `.githooks/` are versioned. **Run `make hooks` once after cloning** to activate them via `core.hooksPath`: `pre-commit` verifies formatting and lints staged C sources, `pre-push` runs `make check`. Both are bypassable with `--no-verify`; CI is the real gate.
 
+## Testing
+
+Unit tests use [Criterion](https://github.com/Snaipe/Criterion) (installed by `make bootstrap`).
+
+```sh
+make test   # build the test binary (debug + ASan/UBSan) and run it
+```
+
+The test binary links the module objects without `main.o` (Criterion provides its own entry point) and is built with sanitizers, so `make test` also catches memory bugs in the tested logic. `make test` runs inside `make check`.
+
+The conformance suite compares `ft_ping` to the reference `ping` from GNU inetutils 2.0. That reference is built, isolated, by:
+
+```sh
+tests/install-etalon.sh     # builds inetutils-2.0 ping into ~/.local/bin/inetutils-ping (never touch the system ping)
+```
+
+Override the install path with `FT_PING_ETALON`. The script verifies the tarball's GPG signature, is idempotent, and grants `cap_net_raw` so the reference runs without sudo.
+
+Other test types (console and packet-level conformance, fuzzing, property-based testing, real coverage) are scaffolded as they become relevant; see `DEFERRED.md`.
+
 ## Academic integrity
 
 > This repository is a 42 school project, published as a portfolio piece. It is shared to be read and studied, not copied. If you follow the 42 cursus (or a similar one), copying this solution violates your school's integrity rules and deprives you of the learning; submissions are screened for plagiarism. Take inspiration from the approach, but write your own code.

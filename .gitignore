@@ -10,7 +10,7 @@
 *.gch
 *.pch
 
-# Out-of-source build directories
+# Out-of-source build directories (also holds the Criterion test binary: obj/test)
 obj/
 build/
 bin/
@@ -47,5 +47,3 @@ compile_commands.json
 
 # Local working space (working docs: methodology, roadmap, subject, PDF)
 docs/
-
-# (Test artifacts — Criterion binary, reports — will be added later)
