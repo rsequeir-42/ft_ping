@@ -10,13 +10,15 @@ CLANG_TIDY="${CLANG_TIDY:-clang-tidy-19}"
 files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(c|h)$' || true)
 [ -z "$files" ] && exit 0
 
-# 1. Formatting: verify only, never rewrite inside the hook.
+# 1. Formatting: verify only, never rewrite inside the hook. Applies to tests too.
 printf '%s\n' "$files" | xargs "$CLANG_FORMAT" --dry-run --Werror
 
-# 2. clang-tidy on staged .c files (headers covered via HeaderFilterRegex). Needs
-#    the compilation database; if absent, warn but do not block -- pre-push and
-#    CI run the full 'make check' anyway.
-c_files=$(printf '%s\n' "$files" | grep -E '\.c$' || true)
+# 2. clang-tidy on staged .c files, EXCLUDING tests/: Criterion's assertion
+#    macros trip misc-include-cleaner, and tests are validated by running them
+#    under ASan. This matches 'make lint', which targets src/ only. Needs the
+#    compilation database; if absent, warn but do not block -- pre-push and CI
+#    run the full 'make check' anyway.
+c_files=$(printf '%s\n' "$files" | grep -E '\.c$' | grep -Ev '^tests/' || true)
 if [ -n "$c_files" ]; then
     if [ -f compile_commands.json ]; then
         printf '%s\n' "$c_files" | xargs "$CLANG_TIDY" -p .

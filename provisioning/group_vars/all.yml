@@ -3,12 +3,18 @@
 # We pin the *major* (gcc-13, clang-format-19), not the exact apt version
 # (which differs across distros): 'state: present', never 'latest'.
 ftping_packages:
-  - gcc-13          # target compiler (>= 13: -Wanalyzer-fd-* checks)
+  - gcc-13            # target compiler (>= 13: -Wanalyzer-fd-* checks)
   - make
-  - clang-format-19 # formatting (pinned major -> identical output on both sides)
-  - clang-tidy-19   # static analysis (Clang)
-  - cppcheck        # static analysis (independent engine)
-  - valgrind        # runtime memory analysis
-  - gcovr           # coverage (structure laid down in the test harness)
-  - bear            # generates compile_commands.json
-  - ansible-lint    # lints the playbook itself
+  - clang-format-19   # formatting (pinned major -> identical output on both sides)
+  - clang-tidy-19     # static analysis (Clang)
+  - cppcheck          # static analysis (independent engine)
+  - valgrind          # runtime memory analysis
+  - gcovr             # coverage (structure laid down in the test harness)
+  - bear              # generates compile_commands.json
+  - ansible-lint      # lints the playbook itself
+  - libcriterion-dev  # unit test framework (Criterion)
+  # inetutils-2.0 reference build deps (tests/install-etalon.sh):
+  - build-essential   # compile the reference from source
+  - xz-utils          # unpack the .tar.xz tarball
+  - gnupg             # verify the tarball signature (gpgv)
+  - libcap2-bin       # setcap/getcap (grant CAP_NET_RAW to the reference)

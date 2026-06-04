@@ -15,10 +15,13 @@ MODE		?= release
 # Preprocessor: include path + automatic header dependencies.
 CPPFLAGS	:= -I$(INCDIR) -MMD -MP
 
-# Compiler: maximal warning set (project decision).
-CFLAGS		:= -Wall -Wextra -Werror -std=gnu11 				\
+# Warning set (project decision). Extracted into WARNINGS so the test build can
+# reuse it minus -Wconversion (Criterion's assertion macros trip that one).
+WARNINGS	:= -Wall -Wextra -Werror -std=gnu11 				\
 			   -Wshadow -Wvla -Wstrict-prototypes -Wformat=2	\
 			   -Wpedantic -Wcast-align -Wconversion
+
+CFLAGS		:= $(WARNINGS)
 
 LDFLAGS		:=
 
@@ -55,9 +58,24 @@ VALGRIND		?= valgrind
 ANALYZER_CC		?= gcc-13
 GCOV			?= gcov-13
 
+# Criterion (unit test framework), discovered via pkg-config. Silenced so a
+# missing lib doesn't spam stderr at parse time -- check-env reports it cleanly.
+CRITERION_CFLAGS := $(shell pkg-config --cflags criterion 2>/dev/null)
+CRITERION_LIBS	 := $(shell pkg-config --libs criterion 2>/dev/null)
+
+# Unit tests: Criterion provides its own main(), so the test binary links the
+# module objects WITHOUT main.o. Built in debug + sanitizers; warnings minus
+# -Wconversion (tripped by Criterion's macros). Lives under obj/ (gitignored).
+TESTDIR		:= tests/unit
+TEST_SRC	:= $(wildcard $(TESTDIR)/test_*.c)
+TEST_OBJDIR	:= obj/test
+TEST_BIN	:= $(TEST_OBJDIR)/test_runner
+LIB_SRC		:= $(filter-out main.c,$(SRC))
+TEST_CFLAGS	:= $(filter-out -Wconversion,$(WARNINGS)) -Og -g3 $(SANITIZE)
+
 # Files for the quality targets: every source+header for formatting; the
 # compiled translation units for clang-tidy (headers covered via HeaderFilterRegex).
-FORMAT_FILES	:= $(shell find $(SRCDIR) $(INCDIR) \( -name '*.c' -o -name '*.h' \) 2>/dev/null)
+FORMAT_FILES	:= $(shell find $(SRCDIR) $(INCDIR) $(TESTDIR) \( -name '*.c' -o -name '*.h' \) 2>/dev/null)
 
 all: $(NAME)
 
@@ -114,6 +132,7 @@ check-env:
 	for t in $(QUALITY_TOOLS); do \
 		command -v $$t >/dev/null 2>&1 || { echo "  missing: $$t"; missing=1; }; \
 	done; \
+	pkg-config --exists criterion 2>/dev/null || { echo "  missing: criterion (libcriterion-dev)"; missing=1; }; \
 	if [ $$missing -ne 0 ]; then \
 		echo "Incomplete toolchain -> run 'make bootstrap'."; exit 1; \
 	fi; \
@@ -160,20 +179,29 @@ memcheck: $(NAME)
 	$(VALGRIND) --leak-check=full --error-exitcode=42 \
 		--errors-for-leak-kinds=definite,possible ./$(NAME)
 
-# Coverage: structure only; the measurement is wired at the test-harness sprint
-# (a .gcda written under sudo would be root-owned, so coverage runs on the
-# unit tests, not the privileged binary). GCOV is pinned to match gcc-13.
+# Coverage: structure only; the measurement is wired once there are unit tests
+# exercising real modules (a .gcda written under sudo would be root-owned, so
+# coverage runs on the unit tests, not the privileged binary). GCOV matches gcc-13.
 coverage:
-	@echo "coverage: no tests yet -- deferred to the test-harness sprint ($(GCOV))"
+	@echo "coverage: deferred until modules exist -- see DEFERRED.md ($(GCOV))"
 	@true
 
-# --- Placeholders wired into 'check' now, filled at the test-harness sprint --
-test:
-	@echo "test: no unit tests yet -- deferred to the test-harness sprint"
-	@true
+# --- Unit tests (Criterion) --------------------------------------------------
+# Test binary = module objects (WITHOUT main.o) + test sources + -lcriterion,
+# compiled in debug/ASan so 'make test' also catches memory bugs in the logic.
+$(TEST_OBJDIR):
+	mkdir -p $(TEST_OBJDIR)
 
+$(TEST_BIN): $(addprefix $(SRCDIR)/,$(LIB_SRC)) $(TEST_SRC) | $(TEST_OBJDIR)
+	$(CC) -I$(INCDIR) $(CRITERION_CFLAGS) $(TEST_CFLAGS) $^ $(CRITERION_LIBS) -o $@
+
+test: $(TEST_BIN)
+	./$(TEST_BIN)
+
+# Placeholder: will run the FULL ft_ping binary under ASan once it is runnable
+# without privilege. The test binary above already exercises the logic under ASan.
 run-asan:
-	@echo "run-asan: nothing runnable yet -- deferred to the test-harness sprint"
+	@echo "run-asan: deferred until ft_ping is runnable -- see DEFERRED.md"
 	@true
 
 # --- Single gate + hook activation -------------------------------------------
