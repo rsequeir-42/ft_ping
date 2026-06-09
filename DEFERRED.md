@@ -49,3 +49,24 @@ Entry format:
 - Current choice: Criterion theories cover chosen vectors; no generative PBT.
 - Why temporary: the pure functions to fuzz with properties (checksum, stats) do not exist yet.
 - Review trigger: the `checksum`/`stats` modules. Planned shape: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 algebraic invariants and "never crashes on arbitrary input".
+
+### DD-006 - analyze and memcheck are informative, not required
+- Status: open
+- Date: 2026-06-10
+- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze` and `memcheck` run on every PR but are not required, so a red one does not block merging.
+- Why temporary: the binary is a stub, so `analyze` (`-fanalyzer`) and `memcheck` (valgrind) exercise nothing real; making them required would block merges on noise or flakiness.
+- Review trigger: the first real logic module. Then promote `analyze` and `memcheck` to required checks alongside `check`.
+
+### DD-007 - trixie runs only the check job
+- Status: open
+- Date: 2026-06-10
+- Current choice: the Debian trixie container runs only the `check` job; `analyze` and `memcheck` run on the ubuntu runner only.
+- Why temporary: on a stub, duplicating the informative jobs inside the trixie container costs install time for no added signal.
+- Review trigger: when `analyze`/`memcheck` become meaningful (real code); extend the matrix to trixie if a divergence on the grading OS would matter.
+
+### DD-008 - No CI dependency cache
+- Status: open
+- Date: 2026-06-10
+- Current choice: each CI job installs the apt toolchain from scratch (well under 90s); nothing is cached.
+- Why temporary: caching the apt fileset is fragile for `libcriterion-dev` (its `.pc`/`.so` and `ldconfig` step), and the install is currently cheap; reproducibility is favored over speed.
+- Review trigger: if install time becomes a bottleneck. Then a pre-provisioned Docker image (sharing the VM's toolchain) rather than an apt fileset cache.

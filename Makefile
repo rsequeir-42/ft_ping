@@ -159,10 +159,13 @@ compile-db: compile_commands.json
 tidy: compile_commands.json
 	$(CLANG_TIDY) -p . $(addprefix $(SRCDIR)/,$(SRC))
 
-# cppcheck: an independent engine, complements clang-tidy.
+# cppcheck: an independent engine, complements clang-tidy. --template=gcc gives
+# the same 'file:line:col: severity:' shape as gcc and clang-tidy, so a single
+# CI problem matcher annotates all three inline in the PR diff.
 cppcheck:
 	$(CPPCHECK) --enable=warning,style,performance,portability --std=c11 \
-		--language=c --error-exitcode=1 --inline-suppr -I$(INCDIR) $(SRCDIR)
+		--language=c --template=gcc --error-exitcode=1 --inline-suppr \
+		-I$(INCDIR) $(SRCDIR)
 
 lint: tidy cppcheck
 
@@ -195,8 +198,16 @@ $(TEST_OBJDIR):
 $(TEST_BIN): $(addprefix $(SRCDIR)/,$(LIB_SRC)) $(TEST_SRC) | $(TEST_OBJDIR)
 	$(CC) -I$(INCDIR) $(CRITERION_CFLAGS) $(TEST_CFLAGS) $^ $(CRITERION_LIBS) -o $@
 
+# 'test' also writes a JUnit report under reports/ (gitignored) for CI to upload.
+# Criterion's provider is named 'xml', not 'junit'; passing a file keeps the
+# console output and the non-zero exit on failure. LSAN_OPTIONS points ASan's
+# leak checker at a suppression for Criterion's own internal leaks (its argument
+# handling strdup's the output spec and never frees it), so leaks in OUR code
+# still fail the build while the framework's do not.
 test: $(TEST_BIN)
-	./$(TEST_BIN)
+	mkdir -p reports
+	LSAN_OPTIONS=suppressions=$(TESTDIR)/lsan.supp \
+		CRITERION_OUTPUTS="xml:reports/junit.xml" ./$(TEST_BIN)
 
 # Placeholder: will run the FULL ft_ping binary under ASan once it is runnable
 # without privilege. The test binary above already exercises the logic under ASan.

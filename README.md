@@ -1,5 +1,7 @@
 # ft_ping
 
+[![CI](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml)
+
 A from-scratch reimplementation of the `ping` command in C, reproducing the behaviour and output of GNU inetutils-2.0. Built for the 42 cursus: it sends ICMP Echo Request packets over a raw socket and measures the round-trip time to a host.
 
 ## Build
@@ -48,7 +50,7 @@ make format-check  # verify formatting only (used by the hook and by check)
 make lint          # clang-tidy + cppcheck
 make analyze       # gcc -fanalyzer (deeper, slower; run on demand, not in check)
 make memcheck      # valgrind on the binary (run on demand, not in check)
-make coverage      # structure only; measurement deferred to the test-harness sprint
+make coverage      # structure only; measurement deferred (see DEFERRED.md)
 make check         # the gate: check-env + format-check + lint + build + tests
 ```
 
@@ -73,6 +75,10 @@ tests/install-etalon.sh     # builds inetutils-2.0 ping into ~/.local/bin/inetut
 Override the install path with `FT_PING_ETALON`. The script verifies the tarball's GPG signature, is idempotent, and grants `cap_net_raw` so the reference runs without sudo.
 
 Other test types (console and packet-level conformance, fuzzing, property-based testing, real coverage) are scaffolded as they become relevant; see `DEFERRED.md`.
+
+## Continuous integration
+
+Every pull request replays `make check` through GitHub Actions, on the development OS (Ubuntu) and inside a Debian trixie container — the OS the project is graded on — so a green check proves the gate passes where it counts. Two informative jobs run `gcc -fanalyzer` and valgrind. The `check` job is a required status check, so `main` only advances through a green pull request: that is the real gate the bypassable git hooks cannot enforce. Action versions are pinned by commit SHA and kept current by Dependabot. See `.github/workflows/ci.yml`.
 
 ## Academic integrity
 
