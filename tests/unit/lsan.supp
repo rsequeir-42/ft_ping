@@ -1,0 +1,9 @@
+# LeakSanitizer suppressions for the Criterion test runner.
+#
+# Criterion's runtime leaks a few small allocations from its own CLI/argument
+# handling -- e.g. criterion_handle_args() strdup's the CRITERION_OUTPUTS spec
+# and never frees it before exit. That is third-party code we do not control;
+# suppressing leaks that originate in libcriterion keeps ASan flagging leaks in
+# OUR modules while ignoring the framework's.
+leak:libcriterion
+leak:criterion_handle_args

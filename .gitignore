@@ -29,6 +29,9 @@ bin/
 coverage/
 coverage.xml
 
+# CI/test reports: JUnit XML (Criterion) and coverage output, written under reports/
+reports/
+
 # Provisioning / VM (Ansible retry files; the ISO and disk normally live
 # outside the repo via FTPING_VM_DIR, ignored here only as a safety net)
 *.retry
