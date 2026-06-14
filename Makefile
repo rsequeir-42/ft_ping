@@ -223,8 +223,15 @@ check: check-env format-check lint debug test run-asan
 hooks:
 	git config core.hooksPath .githooks
 
+# --- Development journal ------------------------------------------------------
+# Serve the mdBook journal locally with live reload (for writing/previewing).
+# Needs mdBook in PATH, installed on demand -- it is NOT part of the toolchain
+# checked by check-env. The generated book/ is gitignored.
+book-serve:
+	mdbook serve --open
+
 -include $(DEP)
 
 .PHONY: all debug release clean fclean re bootstrap vm lint-playbook check-env \
 		format format-check compile-db tidy cppcheck lint analyze memcheck \
-		coverage test run-asan check hooks
+		coverage test run-asan check hooks book-serve
