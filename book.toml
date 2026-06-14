@@ -1,0 +1,15 @@
+# mdBook configuration for the development journal.
+# The book is built from the existing journal/ directory; the generated site
+# (book/) is gitignored and published to GitHub Pages by the pages workflow.
+
+[book]
+title = "ft_ping — journal de bord"
+authors = ["Rafael Sequeira"]
+description = "Journal de développement de ft_ping, une réécriture de ping en C dans le cursus de l'école 42."
+src = "journal"
+language = "fr"
+
+[output.html]
+site-url = "/ft_ping/"
+git-repository-url = "https://github.com/rsequeir-42/ft_ping"
+edit-url-template = "https://github.com/rsequeir-42/ft_ping/edit/main/{path}"
