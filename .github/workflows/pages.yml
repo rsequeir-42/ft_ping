@@ -1,0 +1,59 @@
+name: Pages
+
+# Publish the mdBook journal to GitHub Pages, on every push to main that touches
+# it (and on demand). Separate from ci.yml: it needs elevated permissions, and a
+# deployment must never be cancelled mid-flight.
+on:
+  push:
+    branches: [main]
+    paths:
+      - journal/**
+      - book.toml
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+# Least privilege by default; the deploy job widens it.
+permissions:
+  contents: read
+
+# One deployment at a time; do NOT cancel an in-progress production deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      MDBOOK_VERSION: 0.5.3
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Install mdBook
+        # Precompiled binary (seconds, no Rust toolchain); version pinned in the URL.
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Build the book
+        run: mdbook build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: ./book
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write      # create the Pages deployment
+      id-token: write   # OIDC attestation of provenance
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
