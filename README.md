@@ -1,8 +1,12 @@
 # ft_ping
 
-[![CI](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml)
+[![CI](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsequeir-42/ft_ping/actions/workflows/ci.yml) [![Pages](https://github.com/rsequeir-42/ft_ping/actions/workflows/pages.yml/badge.svg)](https://rsequeir-42.github.io/ft_ping/)
 
 A from-scratch reimplementation of the `ping` command in C, reproducing the behaviour and output of GNU inetutils-2.0. Built for the 42 cursus: it sends ICMP Echo Request packets over a raw socket and measures the round-trip time to a host.
+
+## Development journal
+
+The making of `ft_ping` is documented as it goes, in a series of short essays — in French — on each piece of groundwork laid before the program itself. Read them online: **[ft_ping — journal de bord](https://rsequeir-42.github.io/ft_ping/)**.
 
 ## Build
 

@@ -70,3 +70,17 @@ Entry format:
 - Current choice: each CI job installs the apt toolchain from scratch (well under 90s); nothing is cached.
 - Why temporary: caching the apt fileset is fragile for `libcriterion-dev` (its `.pc`/`.so` and `ldconfig` step), and the install is currently cheap; reproducibility is favored over speed.
 - Review trigger: if install time becomes a bottleneck. Then a pre-provisioned Docker image (sharing the VM's toolchain) rather than an apt fileset cache.
+
+### DD-009 - Open Graph meta tags for the journal
+- Status: open
+- Date: 2026-06-14
+- Current choice: the journal ships mdBook's default `<head>` (a meta description, no Open Graph tags).
+- Why temporary: social-share cards (`og:title`/`og:description`/`og:locale`) would need a `theme/head.hbs` override, one more theme file to maintain against mdBook updates -- not worth it for now.
+- Review trigger: when the journal is shared widely enough that clean link previews matter. Then add a small `theme/head.hbs`.
+
+### DD-010 - Dead-link checking for the journal
+- Status: open
+- Date: 2026-06-14
+- Current choice: links in the journal (mostly the "Sources" sections) are checked by hand.
+- Why temporary: `mdbook-linkcheck2` is another binary to install and pin, and web-link checking is flaky (a momentarily unreachable site is not a dead link); there are few links to watch.
+- Review trigger: when the journal grows link-heavy enough that manual checking becomes unreliable.
