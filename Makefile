@@ -7,7 +7,7 @@ SRCDIR		:= src
 INCDIR		:= include
 
 # Sources listed explicitly (no wildcard: an unlisted file is a deliberate signal).
-SRC			:= main.c
+SRC			:= main.c options.c error.c
 
 # Build profile: release (default), debug or coverage. Use: make MODE=debug
 MODE		?= release
@@ -177,10 +177,14 @@ analyze:
 		$(addprefix $(SRCDIR)/,$(SRC))
 
 # valgrind: catches what ASan does not (uninitialised reads). On a binary
-# WITHOUT capabilities -- valgrind refuses a setcap'd executable.
+# WITHOUT capabilities -- valgrind refuses a setcap'd executable. Driven through
+# argument-only paths that exit 0 (help, then a plain parse); the network engine
+# and the error paths that exit non-zero are covered by other targets.
 memcheck: $(NAME)
 	$(VALGRIND) --leak-check=full --error-exitcode=42 \
-		--errors-for-leak-kinds=definite,possible ./$(NAME)
+		--errors-for-leak-kinds=definite,possible ./$(NAME) --help >/dev/null
+	$(VALGRIND) --leak-check=full --error-exitcode=42 \
+		--errors-for-leak-kinds=definite,possible ./$(NAME) localhost
 
 # Coverage: structure only; the measurement is wired once there are unit tests
 # exercising real modules (a .gcda written under sudo would be root-owned, so
