@@ -18,13 +18,13 @@ Vient ensuite une énumération discrète mais essentielle :
 
 ```c
 enum {
-    ARG_ECHO = 256,
-    ARG_ADDRESS,
-    ARG_TIMESTAMP,
-    ARG_ROUTERDISCOVERY,
-    ARG_TTL,
-    ARG_IPTIMESTAMP,
-    ARG_USAGE
+  ARG_ECHO = 256,
+  ARG_ADDRESS,
+  ARG_TIMESTAMP,
+  ARG_ROUTERDISCOVERY,
+  ARG_TTL,
+  ARG_IPTIMESTAMP,
+  ARG_USAGE
 };
 ```
 
@@ -112,14 +112,14 @@ Avant le callback, une petite fonction traduit un nom de type de requête en val
 
 ```c
 static t_ping_type decode_type(const char *name) {
-    if (strcasecmp(name, "echo") == 0) {
-        return PING_ECHO;
-    }
-    if (strcasecmp(name, "timestamp") == 0) {
-        return PING_TIMESTAMP;
-    }
-    ...
+  if (strcasecmp(name, "echo") == 0) {
     return PING_ECHO;
+  }
+  if (strcasecmp(name, "timestamp") == 0) {
+    return PING_TIMESTAMP;
+  }
+  ...
+  return PING_ECHO;
 }
 ```
 
@@ -132,9 +132,9 @@ On arrive au cœur. `argp` n'agit pas elle-même sur nos données : pour chaque 
 ```c
 /* NOLINTNEXTLINE(readability-non-const-parameter): argp fixes this signature. */
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
-    t_options *out = state->input;
-    switch (key) {
-    ...
+  t_options *out = state->input;
+  switch (key) {
+  ...
 ```
 
 Décortiquons.
@@ -177,16 +177,16 @@ Le corps est un grand `switch (key)`. Parcourons ses familles de cas.
 
 ```c
 case 'v':
-    out->flags |= OPT_VERBOSE;
-    break;
+  out->flags |= OPT_VERBOSE;
+  break;
 ```
 
 **Les types de requête.** `--echo`, `--timestamp`, `--address` posent le champ `type` via `decode_type` :
 
 ```c
 case ARG_ECHO:
-    out->type = decode_type("echo");
-    break;
+  out->type = decode_type("echo");
+  break;
 ```
 
 Comme chaque cas écrase `out->type`, c'est mécaniquement la **dernière** option de type rencontrée qui l'emporte — le comportement « last wins » que les tests vérifient.
@@ -195,8 +195,8 @@ Comme chaque cas écrase `out->type`, c'est mécaniquement la **dernière** opti
 
 ```c
 case '?':
-    out->action = ACT_HELP;
-    break;
+  out->action = ACT_HELP;
+  break;
 ```
 
 C'est la séparation décrite dans les articles précédents : le décodage *note*, l'appelant *agit*.
@@ -208,8 +208,8 @@ case 'c':  /* --count */
 case 'i':  /* --interval */
 ...
 case ARG_IPTIMESTAMP:  /* --ip-timestamp */
-    (void)arg;
-    return 0;
+  (void)arg;
+  return 0;
 ```
 
 Le `(void)arg;` mérite un mot : il signale explicitement qu'on *ignore volontairement* l'argument, ce qui évite tout avertissement « variable inutilisée ». Ces options sont donc **reconnues et acceptées** — leur argument est bien consommé par argp —, mais leur valeur n'est pas encore lue ni validée ; ce sera l'objet de l'étape suivante du projet. Les déclarer dès maintenant garantit que l'aide générée est complète et que la ligne de commande est acceptée telle quelle.
@@ -218,11 +218,11 @@ Le `(void)arg;` mérite un mot : il signale explicitement qu'on *ignore volontai
 
 ```c
 case ARGP_KEY_ARG:
-    if (out->n_hosts == 0) {
-        out->hosts = &state->argv[state->next - 1];
-    }
-    out->n_hosts++;
-    break;
+  if (out->n_hosts == 0) {
+    out->hosts = &state->argv[state->next - 1];
+  }
+  out->n_hosts++;
+  break;
 ```
 
 C'est un idiome subtil. Au moment de cet appel, argp a déjà **avancé** son index interne `state->next` au-delà de l'argument courant ; celui-ci se trouve donc à l'indice `state->next - 1` dans `state->argv`. Plutôt que de **copier** le nom d'hôte, on mémorise, au premier hôte rencontré, l'**adresse** de sa case dans `argv` — `&state->argv[state->next - 1]`. Comme argp regroupe par défaut tous les non-options à la fin du tableau (voir plus bas), les hôtes suivants sont contigus : le couple `hosts` (pointeur de départ) + `n_hosts` (compteur) décrit toute la liste, **sans la moindre allocation**. C'est ce que `ft_ping.h` appelait « une tranche d'`argv` ».
@@ -231,11 +231,11 @@ C'est un idiome subtil. Au moment de cet appel, argp a déjà **avancé** son in
 
 ```c
 case ARGP_KEY_NO_ARGS:
-    if (out->action == ACT_PING) {
-        error_report(state->name, "missing host operand");
-        return EX_USAGE;
-    }
-    break;
+  if (out->action == ACT_PING) {
+    error_report(state->name, "missing host operand");
+    return EX_USAGE;
+  }
+  break;
 ```
 
 Mais l'absence d'hôte n'est une erreur que si l'on s'apprêtait à *pinguer* : un `ft_ping --help` n'a évidemment pas besoin d'hôte. D'où le test sur `out->action`. Si c'est bien une erreur, on imprime le diagnostic via notre module `error` (en utilisant `state->name`, le nom du programme qu'argp a initialisé depuis `argv[0]`), puis **on retourne `EX_USAGE`** — la valeur `64`, code de sortie conventionnel pour un mauvais usage. Ce retour non nul stoppe le parsing et remonte jusqu'à `argp_parse`.
@@ -244,7 +244,7 @@ Mais l'absence d'hôte n'est une erreur que si l'on s'apprêtait à *pinguer* : 
 
 ```c
 default:
-    return ARGP_ERR_UNKNOWN;
+  return ARGP_ERR_UNKNOWN;
 ```
 
 `ARGP_ERR_UNKNOWN` est la constante par laquelle un callback dit à argp « cette clé n'est pas pour moi, débrouille-toi ». C'est un détour amusant : sa valeur réelle est `E2BIG`, un code errno recyclé. Pour les clés que nous ne gérons pas mais qu'argp nous envoie quand même (des notifications d'étape comme « début » ou « fin » du parsing), ce retour est simplement **ignoré** par la bibliothèque — donc inoffensif. Pour une option véritablement inconnue de l'utilisateur, argp prend le relais : elle imprime son propre message et conclut à une erreur.
@@ -265,11 +265,11 @@ Avant chaque analyse, l'état doit être remis aux valeurs par défaut :
 
 ```c
 static void options_reset(t_options *out) {
-    memset(out, 0, sizeof(*out));
-    out->action = ACT_PING;
-    out->type = PING_ECHO;
-    out->count = FT_PING_DEFAULT_COUNT;
-    ...
+  memset(out, 0, sizeof(*out));
+  out->action = ACT_PING;
+  out->type = PING_ECHO;
+  out->count = FT_PING_DEFAULT_COUNT;
+  ...
 }
 ```
 
@@ -281,13 +281,13 @@ La fonction publique principale tient en quelques lignes, mais chacune compte :
 
 ```c
 int options_parse(int argc, char **argv, t_options *out) {
-    error_t rc;
-    options_reset(out);
-    rc = argp_parse(&argp, argc, argv, ARGP_NO_EXIT | ARGP_NO_HELP, NULL, out);
-    if (rc != 0) {
-        return EX_USAGE;
-    }
-    return 0;
+  error_t rc;
+  options_reset(out);
+  rc = argp_parse(&argp, argc, argv, ARGP_NO_EXIT | ARGP_NO_HELP, NULL, out);
+  if (rc != 0) {
+    return EX_USAGE;
+  }
+  return 0;
 }
 ```
 
@@ -306,11 +306,11 @@ Reste à produire les textes que `main` affichera :
 
 ```c
 void options_help(const char *prog) {
-    argp_help(&argp, stdout, ARGP_HELP_STD_HELP & ~ARGP_HELP_EXIT_OK, (char *)prog);
+  argp_help(&argp, stdout, ARGP_HELP_STD_HELP & ~ARGP_HELP_EXIT_OK, (char *)prog);
 }
 
 void options_usage(const char *prog) {
-    argp_help(&argp, stdout, ARGP_HELP_USAGE, (char *)prog);
+  argp_help(&argp, stdout, ARGP_HELP_USAGE, (char *)prog);
 }
 ```
 

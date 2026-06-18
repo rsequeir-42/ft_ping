@@ -10,12 +10,12 @@ Le fichier inclut son propre en-tête (`"error.h"`, le contrat qu'il doit honore
 
 ```c
 void error_try_hint(const char *prog) {
-    (void)fprintf(stderr, "Try '%s --help' or '%s --usage' for more information.\n", prog, prog);
+  (void)fprintf(stderr, "Try '%s --help' or '%s --usage' for more information.\n", prog, prog);
 }
 
 void error_report(const char *prog, const char *message) {
-    (void)fprintf(stderr, "%s: %s\n", prog, message);
-    error_try_hint(prog);
+  (void)fprintf(stderr, "%s: %s\n", prog, message);
+  error_try_hint(prog);
 }
 ```
 

@@ -30,14 +30,14 @@ Sur Linux, cet en-tête correspond à une structure C bien réelle, `struct icmp
 
 ```c
 struct icmphdr {
-    uint8_t  type;        /* 8 = Echo Request, 0 = Echo Reply */
-    uint8_t  code;        /* 0 pour un écho */
-    uint16_t checksum;    /* somme de contrôle (voir plus bas) */
-    union {
-        struct { uint16_t id; uint16_t sequence; } echo;
-        uint32_t gateway; /* autres types ICMP : autre interprétation */
-        /* ... */
-    } un;
+  uint8_t  type;        /* 8 = Echo Request, 0 = Echo Reply */
+  uint8_t  code;        /* 0 pour un écho */
+  uint16_t checksum;    /* somme de contrôle (voir plus bas) */
+  union {
+    struct { uint16_t id; uint16_t sequence; } echo;
+    uint32_t gateway; /* autres types ICMP : autre interprétation */
+    /* ... */
+  } un;
 };
 ```
 
@@ -51,13 +51,13 @@ On regarde le message comme une suite d'entiers de **16 bits**, et on les additi
 
 ```c
 uint16_t checksum(const void *data, size_t len) {
-    const uint16_t *w = data;
-    uint32_t sum = 0;
-    while (len > 1) { sum += *w++; len -= 2; }   /* somme des mots de 16 bits */
-    if (len) sum += *(const uint8_t *)w;          /* octet final esseulé */
-    sum = (sum >> 16) + (sum & 0xffff);           /* repli des retenues */
-    sum += (sum >> 16);                           /* la dernière retenue */
-    return ~sum;                                  /* complément à un */
+  const uint16_t *w = data;
+  uint32_t sum = 0;
+  while (len > 1) { sum += *w++; len -= 2; }   /* somme des mots de 16 bits */
+  if (len) sum += *(const uint8_t *)w;          /* octet final esseulé */
+  sum = (sum >> 16) + (sum & 0xffff);           /* repli des retenues */
+  sum += (sum >> 16);                           /* la dernière retenue */
+  return ~sum;                                  /* complément à un */
 }
 ```
 

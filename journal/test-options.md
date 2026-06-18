@@ -20,7 +20,7 @@ Un détail de construction mérite d'être signalé, car il intrigue : *comment*
 
 ```c
 Test(flags_short, verbose) {
-    /* ... le corps du test ... */
+  /* ... le corps du test ... */
 }
 ```
 
@@ -34,11 +34,11 @@ Tous les cas suivent le même squelette en trois temps : **fabriquer** l'entrée
 
 ```c
 Test(flags_short, verbose) {
-    char *argv[] = {"ft_ping", "-v", "host", NULL};   /* 1. l'entrée fabriquée */
-    t_options o;
+  char *argv[] = {"ft_ping", "-v", "host", NULL};   /* 1. l'entrée fabriquée */
+  t_options o;
 
-    cr_assert(eq(int, options_parse(3, argv, &o), 0)); /* 2. l'appel, code 0 attendu */
-    cr_assert(eq(int, (int)(o.flags & OPT_VERBOSE), OPT_VERBOSE)); /* 3. l'inspection */
+  cr_assert(eq(int, options_parse(3, argv, &o), 0)); /* 2. l'appel, code 0 attendu */
+  cr_assert(eq(int, (int)(o.flags & OPT_VERBOSE), OPT_VERBOSE)); /* 3. l'inspection */
 }
 ```
 
@@ -66,14 +66,14 @@ Certains cas poussent le parseur dans ses retranchements : hôte manquant, optio
 
 ```c
 static void redirect_all(void) {
-    cr_redirect_stdout();
-    cr_redirect_stderr();
+  cr_redirect_stdout();
+  cr_redirect_stderr();
 }
 
 Test(errors, no_argument_at_all, .init = redirect_all) {
-    char *argv[] = {"ft_ping", NULL};
-    t_options o;
-    cr_assert(eq(int, options_parse(1, argv, &o), 64));
+  char *argv[] = {"ft_ping", NULL};
+  t_options o;
+  cr_assert(eq(int, options_parse(1, argv, &o), 64));
 }
 ```
 
