@@ -1,19 +1,19 @@
 /*
-    Unit tests for the command-line parser, options_parse().
+  Unit tests for the command-line parser, options_parse().
 
-    These exercise the parser as it stands at this step: flags without an
-    argument, request types, the help/usage/version actions, operand
-    collection, the "--" separator and reentrance. Options that take an
-    argument are accepted but their values are not stored yet, so the tests
-    only check that the line is accepted and the argument is consumed.
+  They exercise the flags, the request types, the help/usage/version
+  actions, operand collection, the "--" separator, reentrance, and the
+  reading/validation/storage of the options that take an argument: stored
+  values, bounds, rejected inputs and the 1-vs-64 exit codes.
 
-    Conventions:
-        - argv is a local array of string literals terminated by NULL; argc is
-          the count without the trailing NULL. argp only reorders the pointers,
-          never the strings, so literals are safe here.
-        - error paths print on stderr; the redirect_all init swallows that so
-          the diagnostics never reach the test output. Message contents are not
-          asserted (left to a future bats suite).
+  Conventions:
+      - argv is a local array of string literals terminated by NULL; argc is
+        the count without the trailing NULL. argp only reorders the pointers,
+        never the strings, so literals are safe here.
+      - error paths print on stderr; the redirect_all init swallows that so
+        the diagnostics never reach the test output. Exact message text is
+        not asserted here (left to a black-box bats suite); these tests check
+        the exit code and the effect on the record.
 */
 
 #include <criterion/criterion.h>
@@ -42,7 +42,7 @@ Test(defaults, plain_host_yields_inetutils_defaults) {
   cr_assert(eq(int, (int)o.flags, 0));
   cr_assert(eq(sz, o.count, 0));
   cr_assert(eq(sz, o.data_length, 56));
-  cr_assert(eq(dbl, o.interval, 1.0));
+  cr_assert(eq(sz, o.interval, 1000));
   cr_assert(eq(int, o.linger, 10));
   cr_assert(eq(int, o.tos, -1));
   cr_assert(eq(int, o.ttl, 0));
@@ -395,136 +395,380 @@ Test(errors, version_without_host_is_ok, .init = redirect_all) {
   cr_assert(eq(int, o.action, ACT_VERSION));
 }
 
-/* -- value options -- */
-/* Each option taking an argument is accepted (rc 0), its argument consumed,
-   and the trailing host captured. Stored values are not checked yet. */
+/* -- value_stored: a valid argument is read, validated and stored -- */
 
-Test(value_options, count, .init = redirect_all) {
+Test(value_stored, count) {
   char *argv[] = {"ft_ping", "-c", "5", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(sz, o.count, 5));
 }
 
-Test(value_options, ttl, .init = redirect_all) {
-  char *argv[] = {"ft_ping", "--ttl", "64", "host", NULL};
-  t_options o;
-
-  cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
-}
-
-Test(value_options, size, .init = redirect_all) {
+Test(value_stored, size) {
   char *argv[] = {"ft_ping", "-s", "100", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(sz, o.data_length, 100));
 }
 
-Test(value_options, interval, .init = redirect_all) {
+Test(value_stored, interval_seconds_to_ms) {
+  char *argv[] = {"ft_ping", "-i", "2", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(sz, o.interval, 2000));
+  cr_assert(eq(int, (int)(o.flags & OPT_INTERVAL), OPT_INTERVAL));
+}
+
+Test(value_stored, interval_fractional) {
   char *argv[] = {"ft_ping", "-i", "0.5", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(sz, o.interval, 500));
 }
 
-Test(value_options, tos, .init = redirect_all) {
+Test(value_stored, tos) {
   char *argv[] = {"ft_ping", "-T", "16", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, o.tos, 16));
 }
 
-Test(value_options, timeout, .init = redirect_all) {
+Test(value_stored, ttl) {
+  char *argv[] = {"ft_ping", "--ttl", "64", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.ttl, 64));
+}
+
+Test(value_stored, timeout) {
   char *argv[] = {"ft_ping", "-w", "10", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, o.timeout, 10));
 }
 
-Test(value_options, linger, .init = redirect_all) {
+Test(value_stored, linger) {
   char *argv[] = {"ft_ping", "-W", "3", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, o.linger, 3));
 }
 
-Test(value_options, preload, .init = redirect_all) {
+Test(value_stored, preload) {
   char *argv[] = {"ft_ping", "-l", "5", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, (int)o.preload, 5));
 }
 
-Test(value_options, pattern, .init = redirect_all) {
-  char *argv[] = {"ft_ping", "-p", "ff", "host", NULL};
+Test(value_stored, pattern_two_bytes) {
+  char *argv[] = {"ft_ping", "-p", "a1b2", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, o.pattern_len, 2));
+  cr_assert(eq(int, o.pattern[0], 0xa1));
+  cr_assert(eq(int, o.pattern[1], 0xb2));
 }
 
-Test(value_options, type, .init = redirect_all) {
-  char *argv[] = {"ft_ping", "-t", "8", "host", NULL};
+Test(value_stored, pattern_single_digit) {
+  char *argv[] = {"ft_ping", "-p", "f", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, o.pattern_len, 1));
+  cr_assert(eq(int, o.pattern[0], 0x0f));
 }
 
-Test(value_options, ip_timestamp, .init = redirect_all) {
+Test(value_stored, type_echo) {
+  char *argv[] = {"ft_ping", "-t", "echo", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.type, PING_ECHO));
+}
+
+Test(value_stored, type_timestamp) {
+  char *argv[] = {"ft_ping", "-t", "timestamp", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.type, PING_TIMESTAMP));
+}
+
+Test(value_stored, type_address) {
+  char *argv[] = {"ft_ping", "-t", "address", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.type, PING_ADDRESS));
+}
+
+Test(value_stored, type_case_insensitive) {
+  char *argv[] = {"ft_ping", "-t", "ECHO", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.type, PING_ECHO));
+}
+
+Test(value_stored, ip_timestamp_tsonly) {
   char *argv[] = {"ft_ping", "--ip-timestamp", "tsonly", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(4, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, (int)(o.flags & OPT_IPTIMESTAMP), OPT_IPTIMESTAMP));
 }
 
-/* --router is a hidden, not-yet-implemented flag: it must be accepted rather
-   than rejected as an unknown option. */
-Test(value_options, router_hidden_placeholder, .init = redirect_all) {
-  char *argv[] = {"ft_ping", "--router", "host", NULL};
+Test(value_stored, ip_timestamp_tsaddr) {
+  char *argv[] = {"ft_ping", "--ip-timestamp", "tsaddr", "host", NULL};
   t_options o;
 
-  cr_assert(eq(int, options_parse(3, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, (int)(o.flags & OPT_IPTIMESTAMP), OPT_IPTIMESTAMP));
 }
 
-Test(value_options, count_glued_short, .init = redirect_all) {
+/* -- value_forms: argument spellings (glued, =, hex, octal via base 0) -- */
+
+Test(value_forms, glued_short) {
   char *argv[] = {"ft_ping", "-c5", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(3, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(sz, o.count, 5));
 }
 
-Test(value_options, count_long_equals, .init = redirect_all) {
+Test(value_forms, long_equals) {
   char *argv[] = {"ft_ping", "--count=5", "host", NULL};
   t_options o;
 
   cr_assert(eq(int, options_parse(3, argv, &o), 0));
-  cr_assert(eq(sz, o.n_hosts, 1));
-  cr_assert(eq(str, o.hosts[0], "host"));
+  cr_assert(eq(sz, o.count, 5));
+}
+
+Test(value_forms, hex_base0) {
+  char *argv[] = {"ft_ping", "-c", "0x10", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(sz, o.count, 16));
+}
+
+Test(value_forms, octal_base0) {
+  char *argv[] = {"ft_ping", "-c", "010", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(sz, o.count, 8));
+}
+
+/* -- value_bounds: just-below / at / above each limit -- */
+
+Test(value_bounds, size_at_max_ok) {
+  char *argv[] = {"ft_ping", "-s", "65399", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(sz, o.data_length, 65399));
+}
+
+Test(value_bounds, size_above_max_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-s", "65400", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_bounds, tos_at_max_ok) {
+  char *argv[] = {"ft_ping", "-T", "255", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.tos, 255));
+}
+
+Test(value_bounds, tos_above_max_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-T", "256", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_bounds, ttl_min_ok) {
+  char *argv[] = {"ft_ping", "--ttl", "1", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(int, o.ttl, 1));
+}
+
+Test(value_bounds, ttl_zero_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--ttl", "0", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_bounds, ttl_above_max_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--ttl", "256", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_bounds, count_zero_ok) {
+  char *argv[] = {"ft_ping", "-c", "0", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 0));
+  cr_assert(eq(sz, o.count, 0));
+}
+
+Test(value_bounds, timeout_zero_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-w", "0", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_bounds, linger_zero_rejected, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-W", "0", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+/* -- value_errors: malformed values are rejected with status 1 -- */
+
+Test(value_errors, count_not_a_number, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-c", "abc", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, count_trailing_junk, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-c", "5x", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, count_negative, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--count=-1", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 1));
+}
+
+Test(value_errors, count_overflow, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-c", "99999999999999999999", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, size_negative, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--size=-1", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 1));
+}
+
+Test(value_errors, preload_not_a_number, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-l", "abc", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, preload_negative, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--preload=-1", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 1));
+}
+
+Test(value_errors, interval_not_a_number, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-i", "abc", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, interval_negative, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--interval=-1", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 1));
+}
+
+Test(value_errors, pattern_non_hex, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-p", "xyz", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, pattern_too_long, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-p", "000102030405060708090a0b0c0d0e0f10", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, type_unsupported, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-t", "bogus", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_errors, ip_timestamp_unsupported, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--ip-timestamp", "bogus", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+/* --router maps to an unsupported request type (inetutils rejects it too). */
+Test(value_errors, router_unsupported, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--router", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 1));
+}
+
+/* -- value_codes: a bad value exits 1, a usage error exits 64 -- */
+
+Test(value_codes, bad_value_is_1, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-c", "abc", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(4, argv, &o), 1));
+}
+
+Test(value_codes, unknown_option_is_64, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "-Z", "host", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(3, argv, &o), 64));
+}
+
+Test(value_codes, missing_argument_is_64, .init = redirect_all) {
+  char *argv[] = {"ft_ping", "--count", NULL};
+  t_options o;
+
+  cr_assert(eq(int, options_parse(2, argv, &o), 64));
 }
 
 /* -- separator -- */
