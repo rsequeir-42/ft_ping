@@ -1,6 +1,6 @@
 # Le parseur passé au crible
 
-Les pages précédentes ont décrit un parseur : une table, un aiguilleur, un contrat. Mais un parseur, ça se trompe — un bit mal posé, un opérande oublié, un mauvais code de retour. Comment s'assurer qu'il fait, sur chaque ligne de commande imaginable, exactement ce qu'il doit ? En l'interrogeant, méthodiquement. `tests/unit/test_options.c` est cet interrogatoire : **59 cas** qui soumettent au parseur des lignes de commande fabriquées et vérifient le résultat — le tout en mémoire, en une fraction de seconde, sans toucher au réseau.
+Les pages précédentes ont décrit un parseur : une table, un aiguilleur, un contrat. Mais un parseur, ça se trompe — un bit mal posé, un opérande oublié, un mauvais code de retour. Comment s'assurer qu'il fait, sur chaque ligne de commande imaginable, exactement ce qu'il doit ? En l'interrogeant, méthodiquement. `tests/unit/test_options.c` est cet interrogatoire : **93 cas** qui soumettent au parseur des lignes de commande fabriquées et vérifient le résultat — le tout en mémoire, en une fraction de seconde, sans toucher au réseau.
 
 > Cet article suit `tests/unit/test_options.c` au plus près : à chaque évolution du fichier, il est mis à jour dans le même mouvement.
 
@@ -42,9 +42,9 @@ Test(flags_short, verbose) {
 }
 ```
 
-```
-   {"ft_ping", "-v", "host", NULL}  ──►  options_parse(3, argv, &o)  ──►  o.flags & OPT_VERBOSE ?
-        l'entrée fabriquée                  le parseur, en mémoire           on inspecte, on affirme
+```mermaid
+flowchart LR
+    A["argv = { #34;ft_ping#34;, #34;-v#34;, #34;host#34;, NULL }<br/>l'entrée fabriquée"] --> B["options_parse(3, argv, #38;o)<br/>le parseur, en mémoire"] --> C["o.flags #38; OPT_VERBOSE ?<br/>on inspecte, on affirme"]
 ```
 
 Un point appelle une explication, car il a l'air imprudent : `argv` est un tableau **local** de **chaînes littérales**. Ne risque-t-on pas un plantage, argp tentant de modifier des littéraux (que le compilateur place en lecture seule) ? Non — et c'est noté en tête du fichier. Argp réordonne les **pointeurs** du tableau (qui, lui, est local, donc modifiable), jamais le **contenu** des chaînes : il ne fait que les *lire*. Les littéraux sont donc parfaitement sûrs ici. Le premier élément, `"ft_ping"`, n'est pas décoratif : argp saute toujours `argv[0]` (le nom du programme), comme dans un vrai lancement.
@@ -81,7 +81,7 @@ Le `.init = redirect_all` attache cette fonction au cas : Criterion l'exécute *
 
 ## La matrice
 
-L'exhaustivité est l'objectif : chaque option, chaque forme, chaque cas limite. Les 59 cas se répartissent en onze suites.
+L'exhaustivité est l'objectif : chaque option, chaque forme, chaque cas limite. Les 93 cas se répartissent en quinze suites.
 
 | Suite | Cas | Ce qu'elle éprouve |
 |---|---:|---|
@@ -93,7 +93,11 @@ L'exhaustivité est l'objectif : chaque option, chaque forme, chaque cas limite.
 | `actions` | 6 | `--help` / `--usage` / `--version` (court et long), et `host` → `ACT_PING` |
 | `operands` | 4 | un hôte, trois hôtes, et l'ordre relatif préservé malgré la permutation d'argp |
 | `errors` | 6 | le code `64` (hôte manquant, option inconnue) ; et `--help`/`--version` *sans* hôte, qui restent valides |
-| `value_options` | 14 | les options à argument acceptées, l'argument consommé, l'hôte capté (formes ` `, collée, `=`) |
+| `value_stored` | 17 | chaque option à argument lue et **rangée** (count, taille, interval en ms, tos, ttl, types, ip-timestamp, motif…) |
+| `value_forms` | 4 | les graphies de l'argument : collée (`-c5`), `=` (`--count=5`), hexadécimale (`0x10`), octale (`010`) |
+| `value_bounds` | 10 | juste sous / à / au-dessus de chaque limite (`-s` 65399 vs 65400, `--ttl` 0 vs 1 vs 256…) |
+| `value_errors` | 14 | les valeurs refusées : non-numérique, négatif, débordement, motif non-hexa ou trop long, type inconnu… |
+| `value_codes` | 3 | l'asymétrie : une valeur invalide sort en **1**, une erreur d'usage en **64** |
 | `separator` | 2 | le `--` qui transforme un `-v` en simple opérande |
 | `reentrance` | 2 | un second `options_parse` sur le même objet efface bien le premier |
 
@@ -101,7 +105,7 @@ Quelques cas sont plus parlants que d'autres. `defaults` vérifie d'un coup les 
 
 ## Ce qu'on ne teste pas (encore)
 
-Deux silences sont volontaires. D'abord, les **valeurs** des options à argument : à ce stade, `-c 5` est accepté et son `5` consommé, mais non encore stocké ni validé — les cas `value_options` se bornent donc à constater l'acceptation et la capture de l'hôte, pas la valeur. Leur vérification viendra quand le parsing de ces valeurs sera écrit. Ensuite, le **texte exact** des messages d'erreur et d'aide : il sera comparé à l'étalon par une suite en boîte noire, mieux outillée pour la conformité à l'octet. Cette batterie-ci couvre la *logique* du décodage ; ces deux pans la compléteront.
+Un silence demeure, volontaire : le **texte exact** des messages d'erreur et d'aide. Ces tests vérifient le **code** de sortie (1 ou 64) et l'**effet** sur le record (la valeur rangée, le drapeau posé), mais pas le libellé à l'octet (« option value too big: 65400 », « error in pattern near… »). Cette conformité au caractère près relèvera d'une suite en **boîte noire**, qui confrontera la sortie réelle de `ft_ping` à celle de l'étalon — un outillage mieux taillé pour cela. La batterie présente couvre la *logique* du décodage et de la validation ; la boîte noire en sera le complément.
 
 ## Sources
 

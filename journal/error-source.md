@@ -1,25 +1,35 @@
 # Imprimer sans guetter de réponse
 
-L'article sur `error.h` posait le *contrat* : deux fonctions, une voix unique pour les erreurs, un format figé à l'octet. `error.c` en est la **réalisation** — et elle tient en trois lignes de vrai code. Trois lignes seulement ; mais l'une d'elles cache un petit geste qui, pour qui le rencontre la première fois, intrigue : un `(void)` posé devant un appel. C'est lui qui justifie cette page.
+L'article sur `error.h` posait le *contrat* : un format figé à l'octet, et deux sortes de fautes annoncées différemment. `error.c` en est la **réalisation** — quelques lignes à peine. Mais elles cachent deux gestes qui, pour qui les rencontre la première fois, intriguent : un `(void)` posé devant un appel, et une fonction qui prend ses arguments « à la `printf` ». Ce sont eux qui justifient cette page.
 
 > Cet article suit `src/error.c` au plus près : à chaque évolution du fichier, il est mis à jour dans le même mouvement.
 
 ## Le code, en entier
 
-Le fichier inclut son propre en-tête (`"error.h"`, le contrat qu'il doit honorer) et `<stdio.h>` (pour `fprintf` et `stderr`), puis définit les deux fonctions :
+Le fichier inclut son propre en-tête (`"error.h"`, le contrat qu'il doit honorer), `<stdarg.h>` (pour les arguments variables) et `<stdio.h>` (pour `fprintf`/`vfprintf` et `stderr`), puis définit les trois fonctions :
 
 ```c
 void error_try_hint(const char *prog) {
   (void)fprintf(stderr, "Try '%s --help' or '%s --usage' for more information.\n", prog, prog);
 }
 
+void error_value(const char *prog, const char *format, ...) {
+  va_list ap;
+
+  (void)fprintf(stderr, "%s: ", prog);
+  va_start(ap, format);
+  (void)vfprintf(stderr, format, ap);
+  va_end(ap);
+  (void)fputc('\n', stderr);
+}
+
 void error_report(const char *prog, const char *message) {
-  (void)fprintf(stderr, "%s: %s\n", prog, message);
+  error_value(prog, "%s", message);
   error_try_hint(prog);
 }
 ```
 
-La logique est limpide. `error_report` écrit d'abord la ligne « *programme* : *message* », puis **délègue** la seconde ligne à `error_try_hint` : il *compose* les deux lignes plutôt que de tout réécrire, ce qui garantit que le « Try … » est rigoureusement le même, qu'il suive un message ou qu'on l'appelle seul. C'est la factorisation annoncée dans l'article frère, vue ici à l'œuvre.
+La logique se lit de bas en haut. `error_value` imprime « *programme* : *message* » et s'arrête là — c'est la voix des **valeurs invalides**, sans conseil « Try ». Elle prend ses arguments « à la `printf` » : le `...` de sa signature, et le trio `va_list` / `va_start` / `vfprintf`, lui permettent de combler des trous dans le message (« option value too big: **%s** »), tout comme le fait la fonction `error()` de la glibc. `error_report`, la voix des **erreurs d'usage**, n'est plus qu'`error_value` (pour la ligne de message) suivie d'`error_try_hint` (pour le conseil) : un seul format de base, deux fins différentes — la factorisation annoncée dans l'article frère, vue ici à l'œuvre.
 
 ## `fprintf`, en deux mots
 
@@ -43,10 +53,10 @@ On les voit enfin en clair, dans le code : `'%s --help'`. Des apostrophes droite
 
 ## Si peu de code, est-ce normal ?
 
-On pourrait s'étonner qu'un « module » se réduise à trois lignes. C'est précisément l'intention : une frontière d'entrée/sortie doit être **mince et unique**. Tout le soin n'est pas dans la quantité de code, mais ailleurs — dans le format reproduit à l'octet, et dans la petite discipline du `(void)`. Le jour où le réseau apportera ses propres messages, ils passeront, eux aussi, par un point aussi sobre que celui-ci.
+On pourrait s'étonner qu'un « module » se réduise à si peu — trois fonctions courtes. C'est précisément l'intention : une frontière d'entrée/sortie doit être **mince et unique**. Tout le soin n'est pas dans la quantité de code, mais ailleurs — dans le format reproduit à l'octet, dans la petite discipline du `(void)`, et dans la séparation des deux voix. Le jour où le réseau apportera ses propres messages, ils passeront, eux aussi, par un point aussi sobre que celui-ci.
 
 ## Sources
 
-- `man 3 fprintf` — `fprintf`, sa chaîne de format, et sa valeur de retour (octets écrits, ou négatif en cas d'erreur)
+- `man 3 fprintf`, `man 3 vfprintf` — `fprintf`/`vfprintf`, la chaîne de format, les arguments variables (`va_list`), et la valeur de retour (octets écrits, ou négatif en cas d'erreur)
 - CERT C, règle `ERR33-C` — « ne pas ignorer la valeur de retour d'une fonction » : la règle que le `(void)` satisfait explicitement
 - L'article sur `error.h` (« Dire l'erreur d'une seule voix ») — le *pourquoi* de `stderr`, du module unique et du quoting figé

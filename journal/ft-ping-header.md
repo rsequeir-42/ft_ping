@@ -23,7 +23,7 @@ La première moitié fige les réglages que `ft_ping` adopte quand l'utilisateur
 
 **Le rythme et les délais.**
 
-- `INTERVAL = 1.0` — le temps d'attente entre deux envois. Ici, une décision de représentation mérite d'être signalée, car elle nous écarte de l'étalon : inetutils compte cet intervalle en **millisecondes**, dans un entier (`1000`). Nous le stockons en **secondes**, dans un `double` (un nombre à virgule flottante). Pourquoi ? Parce que c'est la forme la plus naturelle pour une option comme `-i 0.5` : on range directement ce que l'utilisateur a écrit, et la conversion vers le délai réel attendra le moment de dormir. Le comportement final est identique — une demi-seconde reste une demi-seconde —, seule la *case* où on le range diffère.
+- `INTERVAL = 1000` — le temps d'attente entre deux envois, **en millisecondes**, dans un `size_t` (un entier non signé). C'est la représentation d'inetutils, reprise telle quelle. L'option `-i 0.5` est bien lue en secondes — avec une virgule flottante, le seul endroit où l'on en a besoin — mais aussitôt multipliée par mille et rangée en **millisecondes entières** : le flottant est confiné à la lecture, et tout le reste du programme calcule en entiers, sans les approximations des nombres à virgule. (L'article « Lire un nombre, et s'en méfier » déplie ce choix.)
 - `LINGER = 10` — le délai, en secondes (un `int`), qu'on accorde à une réponse avant de la considérer perdue.
 - `TIMEOUT = -1` — une échéance globale pour tout le programme. Le `-1` est, là encore, un signal : *aucune* échéance.
 
@@ -55,7 +55,7 @@ Viennent ensuite deux **énumérations** — des listes de constantes nommées. 
 
 ## Le sac d'options
 
-Le cœur du fichier est `t_options` : la structure qui recueille tout ce que l'utilisateur a réclamé. C'est ce qu'on appelle un **POD** — *plain old data*, « bonnes vieilles données » : un simple agrégat de champs, sans la moindre intelligence ni la moindre mémoire à gérer. On y retrouve les deux énumérations (`action`, `type`), puis les réglages décrits plus haut, chacun dans le type qui lui va : `size_t` pour les comptes et tailles (`count`, `data_length`, `n_hosts`), `double` pour l'intervalle, `int` signé pour les réglages à sentinelle (`tos`, `ttl`, `timeout`, et `linger`), et un `unsigned long` pour `preload` (le nombre de paquets lâchés d'emblée par `-l`).
+Le cœur du fichier est `t_options` : la structure qui recueille tout ce que l'utilisateur a réclamé. C'est ce qu'on appelle un **POD** — *plain old data*, « bonnes vieilles données » : un simple agrégat de champs, sans la moindre intelligence ni la moindre mémoire à gérer. On y retrouve les deux énumérations (`action`, `type`), puis les réglages décrits plus haut, chacun dans le type qui lui va : `size_t` pour les comptes et tailles (`count`, `data_length`, `n_hosts`) **et pour l'intervalle** (rangé en millisecondes), `int` signé pour les réglages à sentinelle (`tos`, `ttl`, `timeout`, et `linger`), et un `unsigned long` pour `preload` (le nombre de paquets lâchés d'emblée par `-l`). S'y ajoute un `int status` — non pas une option, mais le **code de sortie** que le parsing retient s'il rencontre une valeur invalide (zéro sinon ; l'article « Lire un nombre, et s'en méfier » l'explique).
 
 Trois champs sortent de l'ordinaire et méritent qu'on les regarde de près — d'autant qu'ils incarnent une promesse forte : **cette structure ne possède aucune mémoire à elle**.
 
@@ -65,20 +65,15 @@ Trois champs sortent de l'ordinaire et méritent qu'on les regarde de près — 
 
 Cette opposition — un motif *à l'intérieur*, une liste d'hôtes *montrée du doigt à l'extérieur* — se voit mieux dessinée :
 
-```
-   t_options  (vit sur la pile, ne possède rien en propre)
-   ┌──────────────────────────────────────────────┐
-   │ action, type, flags, count, interval, …       │  des valeurs, en clair
-   │                                               │
-   │ pattern[16]  [ 00 01 02 … ]                   │  le motif, RANGÉ EN PLACE
-   │                                               │
-   │ hosts  ●──────────────┐                       │  une simple aiguille…
-   │ n_hosts = 2           │                       │
-   └───────────────────────┼────────────────────────┘
-                           │
-                           ▼   …pointée DANS argv (aucune copie)
-   argv = [ "ft_ping", "-v", "host1", "host2", NULL ]
-                              └─────────┴── les deux hôtes
+```mermaid
+flowchart TD
+    subgraph T["t_options — vit sur la pile, ne possède rien en propre"]
+        direction TB
+        V["action, type, flags, count, interval, … (des valeurs, en clair)"]
+        PA["pattern[16] = [ 00 01 02 … ] — le motif, RANGÉ EN PLACE"]
+        HO["hosts (char **), n_hosts = 2 — une simple aiguille"]
+    end
+    HO -->|"…pointée DANS argv (aucune copie)"| AV["argv = { #34;ft_ping#34;, #34;-v#34;, #34;host1#34;, #34;host2#34;, NULL }"]
 ```
 
 Pourquoi se donner cette peine ? Parce qu'une structure qui ne possède rien est **docile** : on peut la créer sur la pile, la remettre à zéro, la copier d'un bloc, sans jamais se demander s'il faut libérer quelque chose. Dupliquer les noms d'hôtes serait du travail et de la mémoire pour rien, puisque `argv` ne bouge pas ; et un motif de seize octets tient sans peine dans la structure elle-même. Aucune allocation, donc aucune fuite possible : c'est un soulagement qu'on appréciera quand le code se compliquera.

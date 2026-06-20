@@ -106,24 +106,27 @@ const char *argp_program_bug_address = "<https://github.com/rsequeir-42/ft_ping/
 
 `argp` reconnaît ce nom précis : si on définit `argp_program_bug_address`, son contenu est imprimé en bas de l'aide, dans une phrase du type « Report bugs to … ». C'est là que nous divergeons sciemment d'inetutils, qui pointe vers son propre traqueur : nous renvoyons vers le nôtre. (Il existe une variable sœur, `argp_program_version`, qui ferait apparaître un `--version` automatique ; nous ne la définissons **pas**, car nous gérons la version nous-mêmes.)
 
-## decode_type : lire un nom de sonde
+## decode_type : lire — et valider — un nom de sonde
 
-Avant le callback, une petite fonction traduit un nom de type de requête en valeur de l'énumération `t_ping_type` :
+Une petite fonction traduit un nom de type de requête (l'argument de `-t`, ou l'option cachée `--router`) en valeur de l'énumération `t_ping_type`, et **refuse** ce qu'elle ne connaît pas :
 
 ```c
-static t_ping_type decode_type(const char *name) {
+static int decode_type(t_options *out, const char *prog, const char *name) {
   if (strcasecmp(name, "echo") == 0) {
-    return PING_ECHO;
+    out->type = PING_ECHO;
+  } else if (strcasecmp(name, "timestamp") == 0) {
+    out->type = PING_TIMESTAMP;
+  } else if (strcasecmp(name, "address") == 0 || strcasecmp(name, "mask") == 0) {
+    out->type = PING_ADDRESS;
+  } else {
+    error_value(prog, "unsupported packet type: %s", name);
+    return value_error(out);
   }
-  if (strcasecmp(name, "timestamp") == 0) {
-    return PING_TIMESTAMP;
-  }
-  ...
-  return PING_ECHO;
+  return 0;
 }
 ```
 
-`strcasecmp` compare deux chaînes **sans tenir compte de la casse** : `echo`, `Echo` et `ECHO` sont équivalents — c'est le comportement d'inetutils. C'est cette fonction qui vit dans `<strings.h>`, d'où l'inclusion séparée signalée plus haut.
+`strcasecmp` compare deux chaînes **sans tenir compte de la casse** : `echo`, `Echo` et `ECHO` sont équivalents — c'est le comportement d'inetutils. (Cette fonction vit dans `<strings.h>`, d'où l'inclusion séparée signalée plus haut.) Un nom inconnu — `-t bogus`, ou `--router`, déclaré mais pas implémenté — n'est plus avalé en silence : il déclenche le diagnostic « unsupported packet type » et le code de retour qui arrête le parsing. C'est cette **validation** que l'article « Lire un nombre, et s'en méfier » généralise à toutes les valeurs.
 
 ## parse_opt : l'aiguilleur
 
@@ -149,20 +152,15 @@ D'un côté, **`argv`** — la ligne de commande brute — est *l'entrée* : c'e
 
 Le va-et-vient se résume ainsi :
 
-```
-options_parse(argc, argv, out)
-        argv ───────────►  argp LIT et découpe la ligne de commande
-        out  ───────────►  argp la RANGE dans state->input (sans jamais la lire)
-                                   │
-        pour chaque option trouvée dans argv, argp nous rappelle :
-                                   ▼
-        parse_opt(key, arg, state)
-            key, arg     = ce qu'argp a EXTRAIT de argv  (ex. 'v', ou "5")
-            state->input = out   (le même pointeur, rendu tel quel)
-                                   │
-                                   ▼
-        t_options *out = state->input;   /* on récupère notre boîte... */
-        out->flags |= OPT_VERBOSE;       /* ...et c'est NOUS qui écrivons dedans */
+```mermaid
+flowchart TD
+    P["options_parse(argc, argv, out)"]
+    P -->|"argv : la ligne de commande brute"| R["argp LIT et découpe argv"]
+    P -->|"out : notre réceptacle"| Sx["argp range out dans state->input<br/>(sans jamais la lire)"]
+    R --> CB{"pour chaque option trouvée<br/>dans argv, argp nous rappelle"}
+    Sx --> CB
+    CB --> PO["parse_opt(key, arg, state)<br/>key, arg = ce qu'argp a extrait de argv (ex. 'v', ou #34;5#34;)<br/>state->input = out (le même pointeur, rendu tel quel)"]
+    PO --> W["t_options *out = state->input;<br/>out->flags |= OPT_VERBOSE;"]
 ```
 
 En somme, **argp lit `argv`, mais c'est nous qui remplissons `out`** ; `state->input` n'est que le fil qui nous rend notre boîte à chaque appel, pour qu'on n'ait pas besoin d'une variable globale pour la retrouver. C'est précisément ce qui rend `parse_opt` dépourvu d'état caché — donc réentrant et testable.
@@ -181,15 +179,15 @@ case 'v':
   break;
 ```
 
-**Les types de requête.** `--echo`, `--timestamp`, `--address` posent le champ `type` via `decode_type` :
+**Les types de requête.** `--echo`, `--timestamp`, `--address` posent directement le champ `type` — leur nom est fixe, il n'y a rien à valider :
 
 ```c
 case ARG_ECHO:
-  out->type = decode_type("echo");
+  out->type = PING_ECHO;
   break;
 ```
 
-Comme chaque cas écrase `out->type`, c'est mécaniquement la **dernière** option de type rencontrée qui l'emporte — le comportement « last wins » que les tests vérifient.
+Comme chaque cas écrase `out->type`, c'est mécaniquement la **dernière** option de type rencontrée qui l'emporte — le comportement « last wins » que les tests vérifient. (L'option `-t`, elle, *valide* son argument via le `decode_type` ci-dessus.)
 
 **L'aide, l'usage, la version.** Ici, le callback n'imprime rien : il se contente d'**enregistrer l'intention** dans `out->action`, et laisse `main` agir :
 
@@ -201,18 +199,20 @@ case '?':
 
 C'est la séparation décrite dans les articles précédents : le décodage *note*, l'appelant *agit*.
 
-**Les options à argument — pour l'instant en attente.** Toutes les options qui prennent une valeur (`-c`, `-i`, `-s`, `--ttl`…) partagent, à cette étape, un traitement minimal :
+**Les options à argument — lues, validées, rangées.** Toutes les options qui prennent une valeur (`-c`, `-i`, `-s`, `--ttl`…) sont routées, d'un seul geste, vers une fonction à part :
 
 ```c
-case 'c':  /* --count */
-case 'i':  /* --interval */
+case 'c':
+case 'i':
 ...
-case ARG_IPTIMESTAMP:  /* --ip-timestamp */
-  (void)arg;
-  return 0;
+case ARG_IPTIMESTAMP:
+  if (parse_value_option(out, state->name, key, arg)) {
+    return out->status;
+  }
+  break;
 ```
 
-Le `(void)arg;` mérite un mot : il signale explicitement qu'on *ignore volontairement* l'argument, ce qui évite tout avertissement « variable inutilisée ». Ces options sont donc **reconnues et acceptées** — leur argument est bien consommé par argp —, mais leur valeur n'est pas encore lue ni validée ; ce sera l'objet de l'étape suivante du projet. Les déclarer dès maintenant garantit que l'aide générée est complète et que la ligne de commande est acceptée telle quelle.
+Pourquoi déporter ce travail dans `parse_value_option` plutôt que l'étaler ici ? Pour deux raisons. D'abord, lire une valeur est une affaire délicate — un nombre peut être négatif, déborder, tomber hors borne — qui mérite sa propre page : « Lire un nombre, et s'en méfier ». Ensuite, pour garder ce `switch` mince : entasser une douzaine de validations dans `parse_opt` lui ferait franchir le seuil de **complexité** que l'analyse statique du projet refuse. Le `if (…) return out->status;` est, lui, le motif de la remontée d'erreur sans `exit()` : en cas de valeur fautive, la fonction appelée a déjà imprimé le diagnostic et inscrit le code dans `out->status` ; il ne reste qu'à le renvoyer pour arrêter argp.
 
 **Les opérandes — la clé spéciale `ARGP_KEY_ARG`.** En plus des options, argp transmet au callback chaque **argument non-option** (un nom d'hôte, pour nous) avec la clé spéciale `ARGP_KEY_ARG` (de valeur `0`) :
 

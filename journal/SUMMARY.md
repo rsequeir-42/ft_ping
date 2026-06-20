@@ -23,6 +23,7 @@
 - [La carte avant le territoire](ft-ping-header.md)
 - [Des interrupteurs et une promesse](options-header.md)
 - [Une table et un aiguilleur](options-source.md)
+- [Lire un nombre, et s'en méfier](options-values.md)
 - [Le parseur passé au crible](test-options.md)
 - [Dire l'erreur d'une seule voix](error-header.md)
 - [Imprimer sans guetter de réponse](error-source.md)
