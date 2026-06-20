@@ -84,3 +84,10 @@ Entry format:
 - Current choice: links in the journal (mostly the "Sources" sections) are checked by hand.
 - Why temporary: `mdbook-linkcheck2` is another binary to install and pin, and web-link checking is flaky (a momentarily unreachable site is not a dead link); there are few links to watch.
 - Review trigger: when the journal grows link-heavy enough that manual checking becomes unreliable.
+
+### DD-011 - Non-root minimum interval for -i
+- Status: open
+- Date: 2026-06-19
+- Current choice: `-i` validates its conversion, sign and overflow and stores the interval in milliseconds, but the 200 ms minimum for a non-root user (inetutils' `PING_MIN_USER_INTERVAL`) is not enforced; `-i 0` is currently accepted.
+- Why temporary: that floor depends on `is_root` (`getuid() == 0`). Enforcing it at parse time mixes parsing with privilege and makes the unit tests UID-dependent (the CI may run as root), whereas inetutils computes `is_root` in `main` and applies the floor when it actually paces the pings -- i.e. in the network stage.
+- Review trigger: the first network sprint (`raw-socket`), where `is_root` is computed as in inetutils. Then reject `interval < PING_MIN_USER_INTERVAL` (200 ms) for a non-root user.

@@ -1,20 +1,24 @@
 /*
-    ft_ping - command-line parsing on top of GNU argp.
+  ft_ping - command-line parsing on top of GNU argp.
 
-    The option table mirrors inetutils-2.0 (ping/ping.c) so that --help and
-    --usage read identically. Parsing is reentrant and exit-free: the parsed
-    record travels through argp's input pointer (no globals), and the only
-    result handed back to main() is a status code.
+  The option table mirrors inetutils-2.0 (ping/ping.c) so that --help and
+  --usage read identically. Parsing is reentrant and exit-free: the parsed
+  record travels through argp's input pointer (no globals), and the only
+  result handed back to main() is a status code.
 
-    This step wires up the flags without arguments, the request types, and
-    the help/usage/version requests. Options that take an argument are
-    declared here (for the help text) but their handlers are placeholders:
-    reading and validating their values is the next step.
+  Every option is wired up here: the flag bits, the request types, the
+  help/usage/version actions, and the reading, validation and storage of
+  the options that take an argument (numbers, the interval, the pattern).
+  A bad value prints a diagnostic, records the exit status, and stops the
+  parse without ever calling exit().
 */
 
 #include "options.h"
 
 #include <argp.h>
+#include <errno.h>
+#include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,10 +47,10 @@ static const char doc[] = "Send ICMP ECHO_REQUEST packets to network hosts."
                           "only to superuser.";
 
 /*
-    Option table. Group numbers and help strings are kept identical to
-    inetutils-2.0. The help/usage/version entries are declared here (group
-    -1) because ft_ping parses with ARGP_NO_HELP and therefore handles them
-    itself rather than letting argp inject its own.
+  Option table. Group numbers and help strings are kept identical to
+  inetutils-2.0. The help/usage/version entries are declared here (group
+  -1) because ft_ping parses with ARGP_NO_HELP and therefore handles them
+  itself rather than letting argp inject its own.
 */
 static struct argp_option argp_options[] = {
 #define GRP 0
@@ -92,24 +96,233 @@ static struct argp_option argp_options[] = {
     {"version", 'V', NULL, 0, "print program version", -1},
     {NULL, 0, NULL, 0, NULL, 0}};
 
-/* Map --echo and friends onto the request type stored in the record. */
-static t_ping_type decode_type(const char *name) {
-  if (strcasecmp(name, "echo") == 0) {
-    return PING_ECHO;
-  }
-  if (strcasecmp(name, "timestamp") == 0) {
-    return PING_TIMESTAMP;
-  }
-  if (strcasecmp(name, "address") == 0) {
-    return PING_ADDRESS;
-  }
-  if (strcasecmp(name, "mask") == 0) {
-    return PING_ADDRESS;
-  }
-  /* "router" and unknown names: validated later, with the argument. */
-  return PING_ECHO;
+/* Mark a value error (exit status 1) once its diagnostic has been printed. */
+static int value_error(t_options *out) {
+  out->status = 1;
+  return 1;
 }
 
+/*
+  Map a request-type name onto out->type. echo / timestamp / address (with
+  its "mask" alias) are the only supported types; anything else is rejected
+  the way inetutils does.
+*/
+static int decode_type(t_options *out, const char *prog, const char *name) {
+  if (strcasecmp(name, "echo") == 0) {
+    out->type = PING_ECHO;
+  } else if (strcasecmp(name, "timestamp") == 0) {
+    out->type = PING_TIMESTAMP;
+  } else if (strcasecmp(name, "address") == 0 || strcasecmp(name, "mask") == 0) {
+    out->type = PING_ADDRESS;
+  } else {
+    error_value(prog, "unsupported packet type: %s", name);
+    return value_error(out);
+  }
+  return 0;
+}
+
+/*
+  Convert and validate a numeric option argument -- our exit-free, robust
+  take on inetutils' ping_cvt_number. strtoul with base 0 (so 0x.. and 0..
+  are accepted). Rejects a leading sign, trailing junk, overflow, a value
+  above maxval (0 means no cap), and zero when allow_zero is false; on
+  success stores the value through *value.
+*/
+static int parse_number(t_options *out, const char *prog, const char *arg, size_t maxval,
+                        int allow_zero, size_t *value) {
+  unsigned long n;
+  char *end;
+
+  if (arg[0] == '-') {
+    error_value(prog, "invalid value (`%s' near `%s')", arg, arg);
+    return value_error(out);
+  }
+  errno = 0;
+  n = strtoul(arg, &end, 0);
+  if (*end != '\0') {
+    error_value(prog, "invalid value (`%s' near `%s')", arg, end);
+    return value_error(out);
+  }
+  if (errno == ERANGE) {
+    error_value(prog, "option value too big: %s", arg);
+    return value_error(out);
+  }
+  if (n == 0 && !allow_zero) {
+    error_value(prog, "option value too small: %s", arg);
+    return value_error(out);
+  }
+  if (maxval != 0 && n > maxval) {
+    error_value(prog, "option value too big: %s", arg);
+    return value_error(out);
+  }
+  *value = n;
+  return 0;
+}
+
+/*
+  Validate -i: a decimal number of seconds (via strtod, hence
+  locale-aware), stored as milliseconds. Rejects a non-numeric tail, a
+  negative value and overflow. The 200 ms non-root floor is deferred to the
+  network stage (DEFERRED.md, DD-011). Sets OPT_INTERVAL.
+*/
+static int parse_interval(t_options *out, const char *prog, const char *arg) {
+  char *end;
+  double v;
+
+  errno = 0;
+  v = strtod(arg, &end);
+  if (*end != '\0') {
+    error_value(prog, "invalid value (`%s' near `%s')", arg, end);
+    return value_error(out);
+  }
+  if (v < 0) {
+    error_value(prog, "invalid value (`%s' near `%s')", arg, arg);
+    return value_error(out);
+  }
+  if (errno == ERANGE || v > (double)SIZE_MAX / 1000.0) {
+    error_value(prog, "option value too big: %s", arg);
+    return value_error(out);
+  }
+  out->interval = (size_t)(v * 1000.0);
+  out->flags |= OPT_INTERVAL;
+  return 0;
+}
+
+/*
+  Validate -l (preload): strtoul base 0, rejecting trailing junk, overflow,
+  or a value above INT_MAX (which also catches a negative, since strtoul
+  wraps it). inetutils' own "invalid preload value" wording is kept.
+*/
+static int parse_preload(t_options *out, const char *prog, const char *arg) {
+  unsigned long n;
+  char *end;
+
+  errno = 0;
+  n = strtoul(arg, &end, 0);
+  if (*end != '\0' || errno == ERANGE || n > (unsigned long)INT_MAX) {
+    error_value(prog, "invalid preload value (%s)", arg);
+    return value_error(out);
+  }
+  out->preload = n;
+  return 0;
+}
+
+/* Hex value of c (0-15), or -1 if c is not a hexadecimal digit. */
+static int hex_digit(char c) {
+  if (c >= '0' && c <= '9') {
+    return c - '0';
+  }
+  if (c >= 'a' && c <= 'f') {
+    return c - 'a' + 10;
+  }
+  if (c >= 'A' && c <= 'F') {
+    return c - 'A' + 10;
+  }
+  return -1;
+}
+
+/*
+  Parse -p: a hex string filling at most FT_PING_MAX_PATTERN bytes, one or
+  two hex digits per byte. A non-hex group is rejected; unlike inetutils, an
+  input longer than the limit is rejected rather than silently truncated.
+*/
+static int decode_pattern(t_options *out, const char *prog, const char *text) {
+  int i;
+
+  for (i = 0; *text != '\0' && i < FT_PING_MAX_PATTERN; i++) {
+    int hi = hex_digit(text[0]);
+    int lo;
+
+    if (hi < 0) {
+      error_value(prog, "error in pattern near %s", text);
+      return value_error(out);
+    }
+    lo = hex_digit(text[1]);
+    if (lo < 0) {
+      out->pattern[i] = (unsigned char)hi;
+      text += 1;
+    } else {
+      out->pattern[i] = (unsigned char)((hi << 4) | lo);
+      text += 2;
+    }
+  }
+  if (*text != '\0') {
+    error_value(prog, "pattern too long (max %d bytes)", FT_PING_MAX_PATTERN);
+    return value_error(out);
+  }
+  out->pattern_len = i;
+  return 0;
+}
+
+/*
+  Validate --ip-timestamp (tsonly or tsaddr). The exact sub-option is not
+  stored yet -- that belongs to the network stage; here we only accept the
+  flag. Sets OPT_IPTIMESTAMP.
+*/
+static int decode_ip_timestamp(t_options *out, const char *prog, const char *arg) {
+  if (strcasecmp(arg, "tsonly") != 0 && strcasecmp(arg, "tsaddr") != 0) {
+    error_value(prog, "unsupported timestamp type: %s", arg);
+    return value_error(out);
+  }
+  out->flags |= OPT_IPTIMESTAMP;
+  return 0;
+}
+
+/*
+  Read, validate and store an option that takes an argument. Returns 0 on
+  success, non-zero (out->status set, a diagnostic printed) on a bad value.
+  Kept apart from parse_opt so that each switch stays simple.
+*/
+static int parse_value_option(t_options *out, const char *prog, int key, const char *arg) {
+  size_t v;
+
+  switch (key) {
+    case 't': /* --type */
+      return decode_type(out, prog, arg);
+    case ARG_ROUTERDISCOVERY: /* --router (hidden, unsupported) */
+      return decode_type(out, prog, "router");
+    case 'c': /* --count */
+      return parse_number(out, prog, arg, 0, 1, &out->count);
+    case 's': /* --size */
+      return parse_number(out, prog, arg, FT_PING_MAX_DATALEN, 1, &out->data_length);
+    case 'i': /* --interval */
+      return parse_interval(out, prog, arg);
+    case 'l': /* --preload */
+      return parse_preload(out, prog, arg);
+    case 'p': /* --pattern */
+      return decode_pattern(out, prog, arg);
+    case ARG_IPTIMESTAMP: /* --ip-timestamp */
+      return decode_ip_timestamp(out, prog, arg);
+    case 'T': /* --tos */
+      if (parse_number(out, prog, arg, 255, 1, &v)) {
+        return 1;
+      }
+      out->tos = (int)v;
+      return 0;
+    case ARG_TTL: /* --ttl */
+      if (parse_number(out, prog, arg, 255, 0, &v)) {
+        return 1;
+      }
+      out->ttl = (int)v;
+      return 0;
+    case 'w': /* --timeout */
+      if (parse_number(out, prog, arg, (size_t)INT_MAX, 0, &v)) {
+        return 1;
+      }
+      out->timeout = (int)v;
+      return 0;
+    case 'W': /* --linger */
+      if (parse_number(out, prog, arg, (size_t)INT_MAX, 0, &v)) {
+        return 1;
+      }
+      out->linger = (int)v;
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+/* cppcheck-suppress constParameterCallback */
 /* NOLINTNEXTLINE(readability-non-const-parameter): argp fixes this signature. */
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   t_options *out = state->input;
@@ -140,13 +353,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
     /* -- Request types -- */
     case ARG_ECHO:
-      out->type = decode_type("echo");
+      out->type = PING_ECHO;
       break;
     case ARG_TIMESTAMP:
-      out->type = decode_type("timestamp");
+      out->type = PING_TIMESTAMP;
       break;
     case ARG_ADDRESS:
-      out->type = decode_type("address");
+      out->type = PING_ADDRESS;
       break;
 
     /* -- Help, usage and version: record the action, let main() print -- */
@@ -160,26 +373,23 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       out->action = ACT_VERSION;
       break;
 
-    /*
-        Options taking an argument. Declared above for the help text;
-        their values are read and validated in the next step. Accept the
-        argument and move on without storing anything.
-    */
-    case 't':                 /* --type */
-    case ARG_ROUTERDISCOVERY: /* --router (hidden) */
-    case 'c':                 /* --count */
-    case 'i':                 /* --interval */
-    case 'T':                 /* --tos */
-    case ARG_TTL:             /* --ttl */
-    case 'w':                 /* --timeout */
-    case 'W':                 /* --linger */
-    case 'l':                 /* --preload */
-    case 'p':                 /* --pattern */
-    case 's':                 /* --size */
-    case ARG_IPTIMESTAMP:     /* --ip-timestamp */
-      (void)arg;
-      /* argument parsing: next step */
-      return 0;
+    /* -- Options taking an argument: read, validate, store (see above) -- */
+    case 't':
+    case ARG_ROUTERDISCOVERY:
+    case 'c':
+    case 's':
+    case 'i':
+    case 'l':
+    case 'p':
+    case ARG_IPTIMESTAMP:
+    case 'T':
+    case ARG_TTL:
+    case 'w':
+    case 'W':
+      if (parse_value_option(out, state->name, key, arg)) {
+        return out->status;
+      }
+      break;
 
     /* -- Operand: a slice of argv, no copy -- */
     case ARGP_KEY_ARG:
@@ -194,7 +404,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       /* Only the normal ping job needs a host. */
       if (out->action == ACT_PING) {
         error_report(state->name, "missing host operand");
-        return EX_USAGE;
+        out->status = EX_USAGE;
+        return out->status;
       }
       break;
 
@@ -227,10 +438,13 @@ int options_parse(int argc, char **argv, t_options *out) {
   options_reset(out);
 
   /*
-      ARGP_NO_EXIT    - return errors instead of calling exit().
-      ARGP_NO_HELP    - we own --help / --usage / --version.
+    ARGP_NO_EXIT    - return errors instead of calling exit().
+    ARGP_NO_HELP    - we own --help / --usage / --version.
   */
   rc = argp_parse(&argp, argc, argv, ARGP_NO_EXIT | ARGP_NO_HELP, NULL, out);
+  if (out->status != 0) {
+    return out->status;
+  }
   if (rc != 0) {
     return EX_USAGE;
   }
@@ -239,8 +453,8 @@ int options_parse(int argc, char **argv, t_options *out) {
 }
 
 /*
-    Render the help list on stdout, forcing the short program name. The
-    caller decides when to exit (ARGP_HELP_EXIT_OK is stripped on purpose).
+  Render the help list on stdout, forcing the short program name. The
+  caller decides when to exit (ARGP_HELP_EXIT_OK is stripped on purpose).
 */
 void options_help(const char *prog) {
   argp_help(&argp, stdout, ARGP_HELP_STD_HELP & ~ARGP_HELP_EXIT_OK, (char *)prog);

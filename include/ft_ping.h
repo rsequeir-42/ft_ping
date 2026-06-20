@@ -14,13 +14,13 @@
 
 /* -- Default values, mirrored from inetutils-2.0 -- */
 
-#define FT_PING_DEFAULT_COUNT 0      /* unlimited until SIGINT */
-#define FT_PING_DEFAULT_DATALEN 56   /* 64 ICMP - 8 header octets */
-#define FT_PING_DEFAULT_INTERVAL 1.0 /* seconds between packets */
-#define FT_PING_DEFAULT_LINGER 10    /* seconds to wait for a reply */
-#define FT_PING_DEFAULT_TOS (-1)     /* triggers only when >= 0 */
-#define FT_PING_DEFAULT_TTL 0        /* 0 means "leave system default" */
-#define FT_PING_DEFAULT_TIMEOUT (-1) /* no global deadline */
+#define FT_PING_DEFAULT_COUNT 0       /* unlimited until SIGINT */
+#define FT_PING_DEFAULT_DATALEN 56    /* 64 ICMP - 8 header octets */
+#define FT_PING_DEFAULT_INTERVAL 1000 /* milliseconds between packets */
+#define FT_PING_DEFAULT_LINGER 10     /* seconds to wait for a reply */
+#define FT_PING_DEFAULT_TOS (-1)      /* triggers only when >= 0 */
+#define FT_PING_DEFAULT_TTL 0         /* 0 means "leave system default" */
+#define FT_PING_DEFAULT_TIMEOUT (-1)  /* no global deadline */
 
 #define FT_PING_MAX_PATTERN 16    /* maximal pattern length */
 #define FT_PING_MAX_DATALEN 65399 /* 65535 - 60 (max IP) - 76 (max ICMP), per inetutils */
@@ -54,7 +54,7 @@ typedef struct s_options {
 
   size_t count;          /* -c : packets to send, 0 = unlimited */
   size_t data_length;    /* -s : payload octets */
-  double interval;       /* -i : seconds between packets */
+  size_t interval;       /* -i : milliseconds between packets */
   int linger;            /* -W : seconds to wait for a reply */
   int tos;               /* -T : type of service, -1 = unset */
   int ttl;               /* --ttl : time-to-live, 0 = unset */
@@ -66,6 +66,8 @@ typedef struct s_options {
 
   char **hosts;   /* operands, a slice of argv */
   size_t n_hosts; /* number of operands */
+
+  int status; /* exit code set on a parse error (0 = success) */
 } t_options;
 
 /*
