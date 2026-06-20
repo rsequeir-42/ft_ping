@@ -14,16 +14,14 @@ Chaque message ICMP porte d'abord un **type** sur un octet. La table est longue 
 
 Le message Echo commence par un en-tête de **8 octets**, dont voici la disposition (les chiffres du haut sont les positions de bits) :
 
-```
- 0                   1                   2                   3
- 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+---------------+---------------+-------------------------------+
-|     Type      |     Code      |           Checksum            |
-+---------------+---------------+-------------------------------+
-|         Identifier            |        Sequence Number        |
-+-------------------------------+-------------------------------+
-|     Données (payload, 56 octets par défaut) ...
-+-----------------------------------------------------
+```mermaid
+packet-beta
+0-7: "Type"
+8-15: "Code"
+16-31: "Checksum"
+32-47: "Identifier"
+48-63: "Sequence Number"
+64-95: "Données (payload, 56 octets par défaut) …"
 ```
 
 Sur Linux, cet en-tête correspond à une structure C bien réelle, `struct icmphdr` (dans `<netinet/ip_icmp.h>`) :

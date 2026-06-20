@@ -22,14 +22,17 @@ Le programme reconnaît une dizaine d'options qui sont de simples bascules — p
 
 Pour saisir ces valeurs, il faut se représenter `flags` non comme un *nombre*, mais comme une **rangée d'interrupteurs** — les 32 bits d'un `unsigned int`, dont on n'utilise que les neuf premiers :
 
-```
-   flags  (unsigned int) — on ne montre que les 9 bits de poids faible
-
-     bit:   8     7     6     5     4     3     2     1     0
-          ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
-          │ IGN │ DBG │ IPT │ VRB │ RRT │ QUI │ NUM │ INT │ FLD │
-          └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
-            0x100 0x080 0x040 0x020 0x010 0x008 0x004 0x002 0x001
+```mermaid
+packet-beta
+0: "FLD"
+1: "INT"
+2: "NUM"
+3: "QUI"
+4: "RRT"
+5: "VRB"
+6: "IPT"
+7: "DBG"
+8: "IGN"
 ```
 
 Chaque masque `OPT_*` est une **puissance de deux** : un nombre dont l'écriture binaire ne comporte qu'un *seul* bit à 1. `0x001` désigne le bit 0, `0x002` le bit 1, `0x004` le bit 2… jusqu'à `0x100`, le bit 8. Neuf masques, neuf bits qui ne se chevauchent jamais — chacun son interrupteur. L'hexadécimal n'est pas un caprice : un chiffre hexadécimal vaut exactement quatre bits, si bien que la suite `1, 2, 4, 8, 10, 20, 40, 80, 100` se lit, pour qui a l'habitude, comme « un bit qui glisse d'un cran vers la gauche » — bien plus parlant que son équivalent décimal `1, 2, 4, …, 256`.
