@@ -22,13 +22,6 @@ Entry format:
 - Why temporary: `ft_ping` emits no packets or statistics yet, so there is nothing to compare for that part.
 - Review trigger: the first network sprint where `ft_ping` prints reply/stat lines. Extend the suite to them, normalizing variable fields (RTT, times).
 
-### DD-002 - Real coverage
-- Status: open
-- Date: 2026-06-03 (run-asan resolved #36, 2026-06-21)
-- Current choice: `coverage` is a placeholder. (The full-binary ASan run, formerly the `run-asan` placeholder, is now realized by the `conformance` target, which runs `ft_ping` under ASan on every CLI path.)
-- Why temporary: there is no real module code to cover yet.
-- Review trigger: the first logic module (checksum/options/stats). Then `coverage` runs gcovr on the unit-test binary.
-
 ### DD-003 - Parser fuzzing
 - Status: open
 - Date: 2026-06-03
@@ -50,12 +43,12 @@ Entry format:
 - Why temporary: the pure functions to fuzz with properties (checksum, stats) do not exist yet.
 - Review trigger: the `checksum`/`stats` modules. Planned shape: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 algebraic invariants and "never crashes on arbitrary input".
 
-### DD-006 - analyze and memcheck are informative, not required
+### DD-006 - analyze, memcheck and coverage are informative, not required
 - Status: open
-- Date: 2026-06-10
-- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze` and `memcheck` run on every PR but are not required, so a red one does not block merging.
-- Why temporary: the binary is a stub, so `analyze` (`-fanalyzer`) and `memcheck` (valgrind) exercise nothing real; making them required would block merges on noise or flakiness.
-- Review trigger: the first real logic module. Then promote `analyze` and `memcheck` to required checks alongside `check`.
+- Date: 2026-06-10 (coverage added #37, 2026-06-21)
+- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze`, `memcheck` and `coverage` run on every PR but are not required, so a red one does not block merging.
+- Why temporary: making them required this early would block merges on noise -- a single uncovered error branch can tip `coverage` under the floor, and `analyze`/`memcheck` are still light on a small codebase.
+- Review trigger: the sprint PR (end of context-and-cli). Then promote `analyze`, `memcheck` and `coverage` to required checks alongside `check`.
 
 ### DD-007 - trixie runs only the check job
 - Status: open

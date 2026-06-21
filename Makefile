@@ -186,12 +186,31 @@ memcheck: $(NAME)
 	$(VALGRIND) --leak-check=full --error-exitcode=42 \
 		--errors-for-leak-kinds=definite,possible ./$(NAME) localhost
 
-# Coverage: structure only; the measurement is wired once there are unit tests
-# exercising real modules (a .gcda written under sudo would be root-owned, so
-# coverage runs on the unit tests, not the privileged binary). GCOV matches gcc-13.
+# Coverage: a dedicated test binary built with --coverage (gcov, NOT sanitizers
+# -- ASan would pollute the counters) at -O0, objects out-of-source so
+# -fprofile-abs-path is required, gcc-13 to match gcov-13. The .gcda counters
+# accumulate across runs, so wipe them first. gcovr reports lines/branches for
+# the modules under test (main.c excluded -- never unit-tested), guarded by a
+# floor that catches a sharp regression without being brittle. Out of `check`
+# (informational), like analyze/memcheck; the report lands in coverage/ (gitignored).
+COV_OBJDIR	:= obj/coverage
+COV_SRC		:= $(addprefix $(SRCDIR)/,$(LIB_SRC)) $(TEST_SRC)
+COV_CFLAGS	:= -I$(INCDIR) $(CRITERION_CFLAGS) $(filter-out -Wconversion,$(WARNINGS)) -O0 -g --coverage -fprofile-abs-path
+COV_FAIL_UNDER	:= 90
+GCOVR		?= gcovr
+
 coverage:
-	@echo "coverage: deferred until modules exist -- see DEFERRED.md ($(GCOV))"
-	@true
+	mkdir -p $(COV_OBJDIR) coverage
+	$(RM) $(COV_OBJDIR)/*.gcda
+	for s in $(COV_SRC); do \
+		$(ANALYZER_CC) $(COV_CFLAGS) -c $$s -o $(COV_OBJDIR)/$$(basename $$s .c).o || exit 1; \
+	done
+	$(ANALYZER_CC) --coverage $(COV_OBJDIR)/*.o $(CRITERION_LIBS) -o $(COV_OBJDIR)/test_coverage
+	./$(COV_OBJDIR)/test_coverage >/dev/null
+	$(GCOVR) --root . --gcov-executable $(GCOV) --object-directory $(COV_OBJDIR) \
+		--filter '$(SRCDIR)/' --exclude '$(SRCDIR)/main\.c' --exclude-unreachable-branches \
+		--fail-under-line $(COV_FAIL_UNDER) --print-summary \
+		--html-details coverage/index.html --cobertura coverage/coverage.xml
 
 # --- Unit tests (Criterion) --------------------------------------------------
 # Test binary = module objects (WITHOUT main.o) + test sources + -lcriterion,
