@@ -13,6 +13,7 @@
 - [Se faire relire par des machines](quality-checks.md)
 - [Le banc d'essai avant la pièce](test-harness.md)
 - [Un gardien hors de ma portée](ci-pipeline.md)
+- [Compter ses angles morts](coverage.md)
 
 # Reconstruire ping
 
