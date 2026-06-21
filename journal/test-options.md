@@ -77,7 +77,7 @@ Test(errors, no_argument_at_all, .init = redirect_all) {
 }
 ```
 
-Le `.init = redirect_all` attache cette fonction au cas : Criterion l'exécute *avant* le test, dans le processus dédié du cas, et détourne les deux flux vers des tampons que rien n'affiche. (C'est ici que l'isolation par *fork* paie : la redirection est propre à ce cas.) Noter ce que ce test affirme, et ce qu'il n'affirme pas : il vérifie le **code de retour** — `64`, soit `EX_USAGE`, pour un hôte manquant — mais **pas** le texte exact du message d'erreur. La conformité à l'octet de ces messages relèvera d'une autre suite, en boîte noire, qui comparera la sortie réelle à celle de l'étalon ; ici, on capture seulement pour ne pas polluer.
+Le `.init = redirect_all` attache cette fonction au cas : Criterion l'exécute *avant* le test, dans le processus dédié du cas, et détourne les deux flux vers des tampons que rien n'affiche. (C'est ici que l'isolation par *fork* paie : la redirection est propre à ce cas.) Noter ce que ce test affirme, et ce qu'il n'affirme pas : il vérifie le **code de retour** — `64`, soit `EX_USAGE`, pour un hôte manquant — mais **pas** le texte exact du message d'erreur. La conformité à l'octet de ces messages relève d'une autre suite, en boîte noire, qui compare la sortie réelle à celle de l'étalon ; ici, on capture seulement pour ne pas polluer.
 
 ## La matrice
 
@@ -105,7 +105,7 @@ Quelques cas sont plus parlants que d'autres. `defaults` vérifie d'un coup les 
 
 ## Ce qu'on ne teste pas (encore)
 
-Un silence demeure, volontaire : le **texte exact** des messages d'erreur et d'aide. Ces tests vérifient le **code** de sortie (1 ou 64) et l'**effet** sur le record (la valeur rangée, le drapeau posé), mais pas le libellé à l'octet (« option value too big: 65400 », « error in pattern near… »). Cette conformité au caractère près relèvera d'une suite en **boîte noire**, qui confrontera la sortie réelle de `ft_ping` à celle de l'étalon — un outillage mieux taillé pour cela. La batterie présente couvre la *logique* du décodage et de la validation ; la boîte noire en sera le complément.
+Un silence demeure, volontaire : le **texte exact** des messages d'erreur et d'aide. Ces tests vérifient le **code** de sortie (1 ou 64) et l'**effet** sur le record (la valeur rangée, le drapeau posé), mais pas le libellé à l'octet (« option value too big: 65400 », « error in pattern near… »). Cette conformité au caractère près relève d'une suite en **boîte noire** (l'article « [Au pied de la lettre](conformance.md) »), qui confronte la sortie réelle de `ft_ping` à celle de l'étalon — un outillage mieux taillé pour cela. La batterie présente couvre la *logique* du décodage et de la validation ; la boîte noire en est le complément.
 
 ## Sources
 

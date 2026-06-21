@@ -25,5 +25,6 @@
 - [Une table et un aiguilleur](options-source.md)
 - [Lire un nombre, et s'en méfier](options-values.md)
 - [Le parseur passé au crible](test-options.md)
+- [Au pied de la lettre](conformance.md)
 - [Dire l'erreur d'une seule voix](error-header.md)
 - [Imprimer sans guetter de réponse](error-source.md)
