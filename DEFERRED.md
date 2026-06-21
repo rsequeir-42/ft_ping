@@ -15,19 +15,19 @@ Entry format:
 
 ---
 
-### DD-001 - Console conformance suite
+### DD-001 - Console conformance for the network output
 - Status: open
-- Date: 2026-06-03
-- Current choice: none yet; the test harness ships unit tests (Criterion) and the etalon installer only.
-- Why temporary: `ft_ping` produces no output yet, so there is nothing to compare against the reference.
-- Review trigger: the first network sprint where `ft_ping` prints a line. Planned shape: a parameterized harness (`FT_PING=`, `REF_PING=`) driven by bats-core, normalizing variable fields and forcing `LC_ALL=C`.
+- Date: 2026-06-03 (CLI surface delivered #36, 2026-06-21)
+- Current choice: the conformance suite covers the CLI surface (help screens, errors) -- a self-contained shell harness comparing the binary's output to snapshots established against the etalon, forced `LC_ALL=C`, `make conformance` inside `check`. The network output (reply lines, statistics) is not covered yet.
+- Why temporary: `ft_ping` emits no packets or statistics yet, so there is nothing to compare for that part.
+- Review trigger: the first network sprint where `ft_ping` prints reply/stat lines. Extend the suite to them, normalizing variable fields (RTT, times).
 
-### DD-002 - Real coverage and full-binary ASan run
+### DD-002 - Real coverage
 - Status: open
-- Date: 2026-06-03
-- Current choice: `coverage` is a placeholder; `run-asan` is a placeholder; the test binary already runs under ASan.
-- Why temporary: there is no real module code to cover, and `ft_ping` does nothing runnable yet.
-- Review trigger: the first logic module (checksum/options/stats). Then `coverage` runs gcovr on the unit-test binary, and `run-asan` exercises the full `ft_ping` under ASan.
+- Date: 2026-06-03 (run-asan resolved #36, 2026-06-21)
+- Current choice: `coverage` is a placeholder. (The full-binary ASan run, formerly the `run-asan` placeholder, is now realized by the `conformance` target, which runs `ft_ping` under ASan on every CLI path.)
+- Why temporary: there is no real module code to cover yet.
+- Review trigger: the first logic module (checksum/options/stats). Then `coverage` runs gcovr on the unit-test binary.
 
 ### DD-003 - Parser fuzzing
 - Status: open
