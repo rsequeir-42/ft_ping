@@ -1,10 +1,11 @@
 # clang-format configuration for ft_ping.
-# Base: LLVM; overrides reflect K&R C with 4-space indent and a 100-column budget.
+# Base: LLVM; overrides reflect K&R C with 2-space indent and a 100-column budget.
 
 Language:           Cpp
 BasedOnStyle:       LLVM
-IndentWidth:        4
+IndentWidth:        2
 UseTab:             Never
+IndentCaseLabels:   true
 BreakBeforeBraces:  Attach
 ColumnLimit:        100
 PointerAlignment:   Right

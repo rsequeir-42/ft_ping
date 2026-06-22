@@ -15,19 +15,12 @@ Entry format:
 
 ---
 
-### DD-001 - Console conformance suite
+### DD-001 - Console conformance for the network output
 - Status: open
-- Date: 2026-06-03
-- Current choice: none yet; the test harness ships unit tests (Criterion) and the etalon installer only.
-- Why temporary: `ft_ping` produces no output yet, so there is nothing to compare against the reference.
-- Review trigger: the first network sprint where `ft_ping` prints a line. Planned shape: a parameterized harness (`FT_PING=`, `REF_PING=`) driven by bats-core, normalizing variable fields and forcing `LC_ALL=C`.
-
-### DD-002 - Real coverage and full-binary ASan run
-- Status: open
-- Date: 2026-06-03
-- Current choice: `coverage` is a placeholder; `run-asan` is a placeholder; the test binary already runs under ASan.
-- Why temporary: there is no real module code to cover, and `ft_ping` does nothing runnable yet.
-- Review trigger: the first logic module (checksum/options/stats). Then `coverage` runs gcovr on the unit-test binary, and `run-asan` exercises the full `ft_ping` under ASan.
+- Date: 2026-06-03 (CLI surface delivered #36, 2026-06-21)
+- Current choice: the conformance suite covers the CLI surface (help screens, errors) -- a self-contained shell harness comparing the binary's output to snapshots established against the etalon, forced `LC_ALL=C`, `make conformance` inside `check`. The network output (reply lines, statistics) is not covered yet.
+- Why temporary: `ft_ping` emits no packets or statistics yet, so there is nothing to compare for that part.
+- Review trigger: the first network sprint where `ft_ping` prints reply/stat lines. Extend the suite to them, normalizing variable fields (RTT, times).
 
 ### DD-003 - Parser fuzzing
 - Status: open
@@ -50,12 +43,12 @@ Entry format:
 - Why temporary: the pure functions to fuzz with properties (checksum, stats) do not exist yet.
 - Review trigger: the `checksum`/`stats` modules. Planned shape: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 algebraic invariants and "never crashes on arbitrary input".
 
-### DD-006 - analyze and memcheck are informative, not required
+### DD-006 - analyze, memcheck and coverage are informative, not required
 - Status: open
-- Date: 2026-06-10
-- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze` and `memcheck` run on every PR but are not required, so a red one does not block merging.
-- Why temporary: the binary is a stub, so `analyze` (`-fanalyzer`) and `memcheck` (valgrind) exercise nothing real; making them required would block merges on noise or flakiness.
-- Review trigger: the first real logic module. Then promote `analyze` and `memcheck` to required checks alongside `check`.
+- Date: 2026-06-10 (coverage added #37, 2026-06-21)
+- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze`, `memcheck` and `coverage` run on every PR but are not required, so a red one does not block merging.
+- Why temporary: making them required this early would block merges on noise -- a single uncovered error branch can tip `coverage` under the floor, and `analyze`/`memcheck` are still light on a small codebase.
+- Review trigger: the sprint PR (end of context-and-cli). Then promote `analyze`, `memcheck` and `coverage` to required checks alongside `check`.
 
 ### DD-007 - trixie runs only the check job
 - Status: open
@@ -84,3 +77,10 @@ Entry format:
 - Current choice: links in the journal (mostly the "Sources" sections) are checked by hand.
 - Why temporary: `mdbook-linkcheck2` is another binary to install and pin, and web-link checking is flaky (a momentarily unreachable site is not a dead link); there are few links to watch.
 - Review trigger: when the journal grows link-heavy enough that manual checking becomes unreliable.
+
+### DD-011 - Non-root minimum interval for -i
+- Status: open
+- Date: 2026-06-19
+- Current choice: `-i` validates its conversion, sign and overflow and stores the interval in milliseconds, but the 200 ms minimum for a non-root user (inetutils' `PING_MIN_USER_INTERVAL`) is not enforced; `-i 0` is currently accepted.
+- Why temporary: that floor depends on `is_root` (`getuid() == 0`). Enforcing it at parse time mixes parsing with privilege and makes the unit tests UID-dependent (the CI may run as root), whereas inetutils computes `is_root` in `main` and applies the floor when it actually paces the pings -- i.e. in the network stage.
+- Review trigger: the first network sprint (`raw-socket`), where `is_root` is computed as in inetutils. Then reject `interval < PING_MIN_USER_INTERVAL` (200 ms) for a non-root user.

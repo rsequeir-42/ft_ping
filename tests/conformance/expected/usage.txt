@@ -1,0 +1,8 @@
+Usage: ft_ping [-dnrvfqR?V] [-t TYPE] [-c NUMBER] [-i NUMBER] [-T NUM] [-w N]
+            [-W N] [-l NUMBER] [-p PATTERN] [-s NUMBER] [--address] [--echo]
+            [--mask] [--timestamp] [--type=TYPE] [--count=NUMBER] [--debug]
+            [--interval=NUMBER] [--numeric] [--ignore-routing] [--ttl=N]
+            [--tos=NUM] [--verbose] [--timeout=N] [--linger=N] [--flood]
+            [--ip-timestamp=FLAG] [--preload=NUMBER] [--pattern=PATTERN]
+            [--quiet] [--route] [--size=NUMBER] [--help] [--usage] [--version]
+            HOST ...

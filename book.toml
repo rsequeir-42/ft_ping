@@ -9,7 +9,14 @@ description = "Journal de développement de ft_ping, une réécriture de ping en
 src = "journal"
 language = "fr"
 
+# Render fenced ```mermaid blocks as diagrams. The preprocessor needs the
+# mdbook-mermaid binary on PATH; the two JS assets referenced below are
+# vendored at the repo root by `mdbook-mermaid install .` and committed.
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
 [output.html]
 site-url = "/ft_ping/"
 git-repository-url = "https://github.com/rsequeir-42/ft_ping"
 edit-url-template = "https://github.com/rsequeir-42/ft_ping/edit/main/{path}"
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
