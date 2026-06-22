@@ -164,7 +164,7 @@ tidy: compile_commands.json
 # CI problem matcher annotates all three inline in the PR diff.
 cppcheck:
 	$(CPPCHECK) --enable=warning,style,performance,portability --std=c11 \
-		--language=c --template=gcc --error-exitcode=1 --inline-suppr \
+		--language=c --template=gcc --error-exitcode=1 --inline-suppr --check-level=exhaustive \
 		-I$(INCDIR) $(SRCDIR)
 
 lint: tidy cppcheck
