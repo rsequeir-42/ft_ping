@@ -1,10 +1,10 @@
 /*
-    ft_ping - program entry point.
+  ft_ping - program entry point.
 
-    A thin humble object: set the locale, parse the command line, then act
-    on the outcome. The help, usage and version requests print to stdout and
-    exit successfully; a parsing error exits with its status code; a normal
-    ping run is wired to the network engine later.
+  A thin humble object: set the locale, parse the command line, then act
+  on the outcome. The help, usage and version requests print to stdout and
+  exit successfully; a parsing error exits with its status code; a normal
+  ping run resolves its targets, then hands off to the network engine later.
 */
 
 #include <locale.h>
@@ -12,8 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "error.h"
 #include "ft_ping.h"
 #include "options.h"
+#include "target.h"
 
 static const char version[] = "ft_ping 1.0\n"
                               "Copyright (C) 2026 Rafael Sequeira.\n"
@@ -61,6 +63,14 @@ int main(int argc, char **argv) {
     exit(rc);
   }
 
-  /* ACT_PING with a valid command line. The network engine lands later. */
-  return 0;
+  /* ACT_PING with a valid command line: resolve each operand in turn. */
+  t_ping ping = {0};
+  for (size_t i = 0; i < options.n_hosts; i++) {
+    if (target_resolve(options.hosts[i], &ping.target) != 0) {
+      error_value(prog, "unknown host");
+      exit(EXIT_FAILURE);
+    }
+    /* next step: open the raw socket, print the header, run the probe loop. */
+  }
+  return 0; /* valid hosts: resolved, then silent until the engine lands */
 }
