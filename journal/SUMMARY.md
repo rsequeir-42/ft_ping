@@ -29,3 +29,4 @@
 - [Au pied de la lettre](conformance.md)
 - [Dire l'erreur d'une seule voix](error-header.md)
 - [Imprimer sans guetter de réponse](error-source.md)
+- [Traduire un nom, et s'arrêter là](target-resolution.md)
