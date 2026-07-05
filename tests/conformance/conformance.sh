@@ -92,6 +92,9 @@ Try \`ft_ping --help' or \`ft_ping --usage' for more information." -- --nope
 check "negative value rejected our way (-w -5) -> 1, not 'too big'" 1 \
 "ft_ping: invalid value (\`-5' near \`-5')" -- -w -5
 
+check "unknown host -> 1, our voice" 1 \
+"ft_ping: unknown host" -- nonexistent-host.invalid
+
 # --- Report ------------------------------------------------------------------
 printf -- '---\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

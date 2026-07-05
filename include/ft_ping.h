@@ -1,15 +1,16 @@
 /*
-    ft_ping - shared types, enumerations and default values.
+  ft_ping - shared types, enumerations and default values.
 
-    A recoding of inetutils-2.0 ping. This header gathers the plain-data
-    option record produced by the command-line parser, the runtime shell,
-    and the compile-time defaults inherited from inetutils-2.0
-    (ping/ping.c, ping/ping_common.h).
+  A recoding of inetutils-2.0 ping. This header gathers the plain-data
+  option record produced by the command-line parser, the runtime shell,
+  and the compile-time defaults inherited from inetutils-2.0
+  (ping/ping.c, ping/ping_common.h).
 */
 
 #ifndef FT_PING_H
 #define FT_PING_H
 
+#include <netinet/in.h>
 #include <stddef.h>
 
 /* -- Default values, mirrored from inetutils-2.0 -- */
@@ -43,8 +44,8 @@ typedef enum e_ping_type {
 } t_ping_type;
 
 /*
-    Parsed command-line options. Plain old data: it owns no memory. The
-    host list points straight into argv, and the pattern is stored inline.
+  Parsed command-line options. Plain old data: it owns no memory. The
+  host list points straight into argv, and the pattern is stored inline.
 */
 typedef struct s_options {
   t_action action;  /* what to do once parsing is over */
@@ -70,12 +71,23 @@ typedef struct s_options {
   int status; /* exit code set on a parse error (0 = success) */
 } t_options;
 
+/* -- A resolved target. POD: owns no memory; the name is copied inline. -- */
+
+#define FT_PING_NAMELEN 1025 /* NI_MAXHOST: longest hostname, kept inline */
+
+typedef struct s_target {
+  char name[FT_PING_NAMELEN];         /* canonical name (host as fallback) */
+  char presentation[INET_ADDRSTRLEN]; /* dotted-quad of the address */
+  struct sockaddr_in addr;            /* the resolved IPv4 address */
+} t_target;
+
 /*
-    Runtime shell. Empty on purpose for now: the network engine fills it in
-    later. Kept here so the rest of the program can already refer to it.
+  Runtime shell. The network engine opens the socket later; the record
+  already carries the resolved target so the rest can refer to it.
 */
 typedef struct s_ping {
-  int fd; /* raw socket descriptor */
+  int fd;          /* raw socket descriptor, opened by the network engine */
+  t_target target; /* the current destination */
 } t_ping;
 
 #endif /* FT_PING_H */
