@@ -6,7 +6,7 @@ Installer un système d'exploitation, c'est d'ordinaire un dialogue : la machine
 
 Avant de comprendre le preseed, il faut connaître `debconf`. C'est le mécanisme, propre à Debian, qui centralise toute la configuration : chaque question qu'un paquet pourrait poser y est enregistrée, avec sa réponse. L'installateur ne « pose » pas vraiment les questions de lui-même - il les lit dans `debconf`, et n'interroge l'utilisateur que pour celles dont la réponse manque.
 
-Le preseed exploite exactement cela : c'est un fichier qui **remplit `debconf` à l'avance**. Si la réponse est déjà là, la question ne s'affice pas. On préremplit toutes les réponses, et l'installateur traverses ses écrans sans jamais s'arrêter.
+Le preseed exploite exactement cela : c'est un fichier qui **remplit `debconf` à l'avance**. Si la réponse est déjà là, la question ne s'affiche pas. On préremplit toutes les réponses, et l'installateur traverse ses écrans sans jamais s'arrêter.
 
 ## Une grammaire de quatre mots
 
@@ -22,9 +22,21 @@ C'est verbeux, mais limpide : chaque ligne répond à exactement une question, e
 
 ## Le vrai piège : le moment
 
-Là où j'ai buté, ce n'est pas la grammaire, c'est la *chronologie*. Toutes les réponses ne sont pas consultées au même instant. Certaines questions - la langue, le clavier - sont posées tout au début, avant même que l'installateur ait fini de charger les fichiers de preseed. Les préremplir dans le fichier ne suffit donc pas : à la seconde où la question tombe, l'installateur ne les a pas encore lues.
+Là où j'ai buté, ce n'est pas la grammaire, c'est la *chronologie*. Toutes les réponses ne sont pas consultées au même instant. Certaines questions - la langue, le clavier - sont posées tout au début, avant même que l'installateur ait fini de charger le fichier de preseed. Les préremplir dans le fichier ne suffit donc pas : à la seconde où la question tombe, l'installateur ne l'a pas encore lu.
 
-La parade tien à *où* l'on écrit la réponse. Pour ces quelques questions précoces, on ne les met pas dans le fichier, mais directement en *paramètre de démarrage* du noyau - sur la ligne même qui lance l'installateur. Ces paramètres-là, eux, sont disponibles dès la première seconde. Le fichier de preseed couvre tout le reste ; les paramètres de démarrage couvrent l'amorce. Comprendre cette frontière m'a coûté quelques essais.
+Un exemple concret, vécu. La langue de l'installation se déclare dans le fichier ainsi :
+
+```
+d-i debian-installer/locale string en_US.UTF-8
+```
+
+Or cette ligne n'est *jamais* consultée à temps : l'écran de choix de langue apparaît avant que le fichier ne soit monté. La même réponse doit alors être donnée autrement - en *paramètre de démarrage* du noyau, sur la ligne même qui lance l'installateur :
+
+```
+locale=en_US.UTF-8 keymap=us
+```
+
+Ces paramètres-là, écrits directement dans la configuration d'amorçage de l'image, sont disponibles dès la première seconde, avant tout montage de fichier. La règle qui s'est dégagée est simple : les toutes premières questions passent par les paramètres de démarrage, le fichier de preseed couvre tout le reste. Comprendre cette frontière m'a coûté quelques essais - l'installation s'arrêtait obstinément sur l'écran de langue, alors que la réponse était « pourtant dans le fichier ».
 
 ## La touche finale : late_command
 
