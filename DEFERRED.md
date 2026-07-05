@@ -43,13 +43,6 @@ Entry format:
 - Why temporary: the pure functions to fuzz with properties (checksum, stats) do not exist yet.
 - Review trigger: the `checksum`/`stats` modules. Planned shape: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 algebraic invariants and "never crashes on arbitrary input".
 
-### DD-006 - analyze, memcheck and coverage are informative, not required
-- Status: open
-- Date: 2026-06-10 (coverage added #37, 2026-06-21)
-- Current choice: in CI, the `check` job (both legs) is a required status check; `analyze`, `memcheck` and `coverage` run on every PR but are not required, so a red one does not block merging.
-- Why temporary: making them required this early would block merges on noise -- a single uncovered error branch can tip `coverage` under the floor, and `analyze`/`memcheck` are still light on a small codebase.
-- Review trigger: the sprint PR (end of context-and-cli). Then promote `analyze`, `memcheck` and `coverage` to required checks alongside `check`.
-
 ### DD-007 - trixie runs only the check job
 - Status: open
 - Date: 2026-06-10
@@ -84,3 +77,10 @@ Entry format:
 - Current choice: `-i` validates its conversion, sign and overflow and stores the interval in milliseconds, but the 200 ms minimum for a non-root user (inetutils' `PING_MIN_USER_INTERVAL`) is not enforced; `-i 0` is currently accepted.
 - Why temporary: that floor depends on `is_root` (`getuid() == 0`). Enforcing it at parse time mixes parsing with privilege and makes the unit tests UID-dependent (the CI may run as root), whereas inetutils computes `is_root` in `main` and applies the floor when it actually paces the pings -- i.e. in the network stage.
 - Review trigger: the first network sprint (`raw-socket`), where `is_root` is computed as in inetutils. Then reject `interval < PING_MIN_USER_INTERVAL` (200 ms) for a non-root user.
+
+### DD-012 - Resolution runs before any socket
+- Status: open
+- Date: 2026-06-23
+- Current choice: `target_resolve` runs before any socket exists. A host that fails to resolve yields `ft_ping: unknown host` (exit 1) even with no privilege.
+- Why temporary: inetutils opens the raw socket FIRST, then drops privilege, then resolves (least privilege: acquire the privileged resource, desescalate, work) -- so without `CAP_NET_RAW` it prints `Lacking privilege for icmp socket.` before ever resolving. At this sprint there is no socket yet, so resolution comes first by construction.
+- Review trigger: the `raw-socket` sprint. Decide the order then, weighing least privilege (socket first) against testability (the conformance suite runs without the capability, so resolving first is what lets us test `unknown host` offline).
