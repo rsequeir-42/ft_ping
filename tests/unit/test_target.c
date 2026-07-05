@@ -1,8 +1,10 @@
 /*
-  ft_ping - unit tests for target resolution (pure core).
+  ft_ping - unit tests for target resolution.
 
   AI_NUMERICHOST yields a real addrinfo for a literal IP without any DNS, so the
-  address-selection and header-formatting logic is exercised offline.
+  pure core (address selection, header formatting) is exercised offline. A literal
+  IP also drives target_resolve() itself network-free: getaddrinfo resolves a
+  dotted-quad without a DNS lookup, so its success path is covered too.
 */
 
 #include <criterion/criterion.h>
@@ -54,4 +56,14 @@ Test(target, header_reflects_s_option) {
   from_literal("127.0.0.1", &t);
   target_format_header(&t, 100, buf, sizeof(buf));
   cr_assert_str_eq(buf, "PING 127.0.0.1 (127.0.0.1): 100 data bytes");
+}
+
+/* target_resolve() end to end on a literal IP: no DNS, so it stays deterministic
+   and offline while covering the effectful boundary's success path. */
+Test(target, resolve_literal_ip) {
+  t_target t;
+  cr_assert_eq(target_resolve("127.0.0.1", &t), 0);
+  cr_assert_str_eq(t.name, "127.0.0.1");
+  cr_assert_str_eq(t.presentation, "127.0.0.1");
+  cr_assert_eq(t.addr.sin_family, AF_INET);
 }
