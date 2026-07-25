@@ -30,3 +30,4 @@
 - [Dire l'erreur d'une seule voix](error-header.md)
 - [Imprimer sans guetter de réponse](error-source.md)
 - [Traduire un nom, et s'arrêter là](target-resolution.md)
+- [Ouvrir une porte gardée](raw-socket.md)
