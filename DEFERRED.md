@@ -31,10 +31,10 @@ Entry format:
 
 ### DD-004 - Packet-level conformance
 - Status: open
-- Date: 2026-06-03
-- Current choice: not set up.
-- Why temporary: `ft_ping` emits no packets yet.
-- Review trigger: the `icmp-packet`/`checksum` modules. Planned shape: capture with tcpdump in a netns, assert ICMP fields/checksum with scapy; a separate `check-wire` target.
+- Date: 2026-06-03 (icmp-packet reached 2026-07-25)
+- Current choice: the built packet is asserted byte-for-byte in a UNIT test (test_icmp), but nothing is captured on the wire.
+- Why temporary: `ft_ping` now builds a packet but does not transmit it yet, so there is nothing to capture.
+- Review trigger: the `send-receive` sprint, where packets are actually emitted. Planned shape: capture with tcpdump in a netns, assert ICMP fields/checksum with scapy; a separate `check-wire` target.
 
 ### DD-005 - Property-based testing
 - Status: open

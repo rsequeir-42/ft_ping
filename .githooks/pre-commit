@@ -17,11 +17,12 @@ printf '%s\n' "$files" | xargs "$CLANG_FORMAT" --dry-run --Werror
 #    macros trip misc-include-cleaner, and tests are validated by running them
 #    under ASan. This matches 'make lint', which targets src/ only. Needs the
 #    compilation database; if absent, warn but do not block -- pre-push and CI
-#    run the full 'make check' anyway.
+#    run the full 'make check' anyway. --extra-arg lets clang-tidy tolerate the
+#    gcc-only -Wcast-align=strict recorded in compile_commands.json.
 c_files=$(printf '%s\n' "$files" | grep -E '\.c$' | grep -Ev '^tests/' || true)
 if [ -n "$c_files" ]; then
     if [ -f compile_commands.json ]; then
-        printf '%s\n' "$c_files" | xargs "$CLANG_TIDY" -p .
+        printf '%s\n' "$c_files" | xargs "$CLANG_TIDY" -p . --extra-arg=-Wno-unknown-warning-option
     else
         echo "pre-commit: compile_commands.json missing, skipping clang-tidy (run 'make compile-db')" >&2
     fi

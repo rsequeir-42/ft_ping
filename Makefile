@@ -7,7 +7,7 @@ SRCDIR		:= src
 INCDIR		:= include
 
 # Sources listed explicitly (no wildcard: an unlisted file is a deliberate signal).
-SRC			:= main.c options.c error.c target.c net.c
+SRC			:= main.c options.c error.c target.c net.c icmp.c
 
 # Build profile: release (default), debug or coverage. Use: make MODE=debug
 MODE		?= release
@@ -19,7 +19,7 @@ CPPFLAGS	:= -I$(INCDIR) -MMD -MP
 # reuse it minus -Wconversion (Criterion's assertion macros trip that one).
 WARNINGS	:= -Wall -Wextra -Werror -std=gnu11 				\
 			   -Wshadow -Wvla -Wstrict-prototypes -Wformat=2	\
-			   -Wpedantic -Wcast-align -Wconversion
+			   -Wpedantic -Wcast-align=strict -Wconversion
 
 CFLAGS		:= $(WARNINGS)
 
@@ -157,7 +157,7 @@ compile-db: compile_commands.json
 
 # clang-tidy on the compiled translation units (headers via HeaderFilterRegex).
 tidy: compile_commands.json
-	$(CLANG_TIDY) -p . $(addprefix $(SRCDIR)/,$(SRC))
+	$(CLANG_TIDY) -p . --extra-arg=-Wno-unknown-warning-option $(addprefix $(SRCDIR)/,$(SRC))
 
 # cppcheck: an independent engine, complements clang-tidy. --template=gcc gives
 # the same 'file:line:col: severity:' shape as gcc and clang-tidy, so a single

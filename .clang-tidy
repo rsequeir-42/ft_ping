@@ -26,4 +26,4 @@ WarningsAsErrors:   '*'
 HeaderFilterRegex:  '^(src|include)/.*\.h$'
 FormatStyle:        file
 CheckOptions:
-  misc-include-cleaner.IgnoreHeaders: 'asm/.*;asm-generic/.*;bits/.*;linux/.*;netinet/.*'
+  misc-include-cleaner.IgnoreHeaders: 'asm/.*;asm-generic/.*;bits/.*;linux/.*;netinet/.*;arpa/.*'
