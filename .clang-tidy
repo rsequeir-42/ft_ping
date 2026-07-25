@@ -3,6 +3,11 @@
 # (ICMP type constants are not "magic numbers", short names like fd/n/i are clear
 # in context, easily-swappable-parameters is noisy on C signatures, and the
 # Annex K *_s functions that insecureAPI asks for are absent from glibc).
+#
+# misc-include-cleaner is kept ON for project headers (it enforces direct
+# includes, e.g. pulling in ft_ping.h/net.h) but told to ignore the low-level
+# system header families whose macros/enums live in non-includable inner headers
+# (asm-generic/socket.h for SOL_SOCKET, the netinet enums for IPPROTO_*, etc.).
 
 Checks: >
   bugprone-*,
@@ -20,3 +25,5 @@ Checks: >
 WarningsAsErrors:   '*'
 HeaderFilterRegex:  '^(src|include)/.*\.h$'
 FormatStyle:        file
+CheckOptions:
+  misc-include-cleaner.IgnoreHeaders: 'asm/.*;asm-generic/.*;bits/.*;linux/.*;netinet/.*'

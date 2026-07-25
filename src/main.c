@@ -7,13 +7,16 @@
   ping run resolves its targets, then hands off to the network engine later.
 */
 
+#include <errno.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "error.h"
 #include "ft_ping.h"
+#include "net.h"
 #include "options.h"
 #include "target.h"
 
@@ -63,14 +66,27 @@ int main(int argc, char **argv) {
     exit(rc);
   }
 
-  /* ACT_PING with a valid command line: resolve each operand in turn. */
+  /* ACT_PING with a valid command line: resolve each operand, then open the
+     socket once and reuse it. */
   t_ping ping = {0};
+  ping.fd = -1;
   for (size_t i = 0; i < options.n_hosts; i++) {
     if (target_resolve(options.hosts[i], &ping.target) != 0) {
       error_value(prog, "unknown host");
       exit(EXIT_FAILURE);
     }
-    /* next step: open the raw socket, print the header, run the probe loop. */
+    if (ping.fd < 0) {
+      ping.fd = net_open(&ping.socktype);
+      if (ping.fd < 0) {
+        const char *m = net_socket_error(errno);
+        error_value(prog, "%s", m ? m : strerror(errno));
+        exit(EXIT_FAILURE);
+      }
+    }
+    /* next: print the header (with ping.ident) and run the probe loop. */
   }
-  return 0; /* valid hosts: resolved, then silent until the engine lands */
+  if (ping.fd >= 0) {
+    close(ping.fd);
+  }
+  return 0; /* valid hosts: resolved and socket ready, silent until the engine lands */
 }

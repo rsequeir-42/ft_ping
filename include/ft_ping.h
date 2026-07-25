@@ -86,7 +86,9 @@ typedef struct s_target {
   already carries the resolved target so the rest can refer to it.
 */
 typedef struct s_ping {
-  int fd;          /* raw socket descriptor, opened by the network engine */
+  int fd;          /* socket ICMP, -1 while closed */
+  int ident;       /* ICMP identifier = getpid() & 0xFFFF */
+  int socktype;    /* SOCK_RAW or SOCK_DGRAM (mode obtained) */
   t_target target; /* the current destination */
 } t_ping;
 

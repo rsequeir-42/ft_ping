@@ -7,7 +7,7 @@ SRCDIR		:= src
 INCDIR		:= include
 
 # Sources listed explicitly (no wildcard: an unlisted file is a deliberate signal).
-SRC			:= main.c options.c error.c target.c
+SRC			:= main.c options.c error.c target.c net.c
 
 # Build profile: release (default), debug or coverage. Use: make MODE=debug
 MODE		?= release
@@ -184,7 +184,8 @@ memcheck: $(NAME)
 	$(VALGRIND) --leak-check=full --error-exitcode=42 \
 		--errors-for-leak-kinds=definite,possible ./$(NAME) --help >/dev/null
 	$(VALGRIND) --leak-check=full --error-exitcode=42 \
-		--errors-for-leak-kinds=definite,possible ./$(NAME) localhost
+		--errors-for-leak-kinds=definite,possible ./$(NAME) 127.0.0.1 >/dev/null 2>&1; \
+		[ $$? -ne 42 ]
 
 # Coverage: a dedicated test binary built with --coverage (gcov, NOT sanitizers
 # -- ASan would pollute the counters) at -O0, objects out-of-source so

@@ -76,11 +76,11 @@ Entry format:
 - Date: 2026-06-19
 - Current choice: `-i` validates its conversion, sign and overflow and stores the interval in milliseconds, but the 200 ms minimum for a non-root user (inetutils' `PING_MIN_USER_INTERVAL`) is not enforced; `-i 0` is currently accepted.
 - Why temporary: that floor depends on `is_root` (`getuid() == 0`). Enforcing it at parse time mixes parsing with privilege and makes the unit tests UID-dependent (the CI may run as root), whereas inetutils computes `is_root` in `main` and applies the floor when it actually paces the pings -- i.e. in the network stage.
-- Review trigger: the first network sprint (`raw-socket`), where `is_root` is computed as in inetutils. Then reject `interval < PING_MIN_USER_INTERVAL` (200 ms) for a non-root user.
+- Review trigger: the sprint that actually paces the probes. `raw-socket` did not introduce `is_root` after all -- the setuid drop was dropped (see DD-013), so nothing computes `getuid()` yet. Enforce `interval < PING_MIN_USER_INTERVAL` (200 ms) for a non-root user when the send loop honors `-i`.
 
-### DD-012 - Resolution runs before any socket
+### DD-013 - Effective drop of CAP_NET_RAW
 - Status: open
-- Date: 2026-06-23
-- Current choice: `target_resolve` runs before any socket exists. A host that fails to resolve yields `ft_ping: unknown host` (exit 1) even with no privilege.
-- Why temporary: inetutils opens the raw socket FIRST, then drops privilege, then resolves (least privilege: acquire the privileged resource, desescalate, work) -- so without `CAP_NET_RAW` it prints `Lacking privilege for icmp socket.` before ever resolving. At this sprint there is no socket yet, so resolution comes first by construction.
-- Review trigger: the `raw-socket` sprint. Decide the order then, weighing least privilege (socket first) against testability (the conformance suite runs without the capability, so resolving first is what lets us test `unknown host` offline).
+- Date: 2026-07-25
+- Current choice: after opening the socket, `ft_ping` does not drop the capability. inetutils' `setuid(getuid())` is a no-op under our deployment models (sudo: the real UID is already 0; file capability: no transition from UID 0, so the kernel does not clear `CAP_NET_RAW`), so we do not reproduce it.
+- Why temporary: the real hardening -- removing `CAP_NET_RAW` from the effective set via libcap (`cap_set_proc`) -- would add a `-lcap` dependency for little gain on a single-capability binary.
+- Review trigger: if the binary gains other capabilities, or if a security audit requires an effective drop.

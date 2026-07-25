@@ -22,6 +22,7 @@ export LC_ALL=C
 
 pass=0
 fail=0
+skip=0
 
 # Run ft_ping with argv[0] forced to the bare name -- argp prints argv[0] VERBATIM
 # for its own errors, so this keeps the snapshots free of any invocation path.
@@ -57,6 +58,12 @@ check_screen() {
   shift 2
   [ "${1:-}" = "--" ] && shift
   check "$desc" 0 "$(<"$EXPECTED/$file")" -- "$@"
+}
+
+# skip <desc> <reason> : record a case not applicable in this environment.
+skip() {
+  printf 'skip - %s (%s)\n' "$1" "$2"
+  skip=$((skip + 1))
 }
 
 # --- Help screens (long output: file snapshots) ------------------------------
@@ -95,6 +102,16 @@ check "negative value rejected our way (-w -5) -> 1, not 'too big'" 1 \
 check "unknown host -> 1, our voice" 1 \
 "ft_ping: unknown host" -- nonexistent-host.invalid
 
+# --- Raw socket: no privilege -> the etalon's privilege message ------------
+# Only meaningful without privilege; the conformance binary is never setcap'd,
+# so the sole privileged environment is root (CI trixie), which we skip.
+if [ "$(id -u)" != 0 ]; then
+  check "no privilege -> Lacking privilege, exit 1" 1 \
+"ft_ping: Lacking privilege for icmp socket." -- 127.0.0.1
+else
+  skip "no privilege -> Lacking privilege" "running as root"
+fi
+
 # --- Report ------------------------------------------------------------------
-printf -- '---\n%d passed, %d failed\n' "$pass" "$fail"
+printf -- '---\n%d passed, %d failed, %d skipped\n' "$pass" "$fail" "$skip"
 [ "$fail" -eq 0 ]
