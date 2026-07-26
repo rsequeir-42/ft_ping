@@ -1,14 +1,17 @@
 /*
-  ft_ping - ICMP Echo Request serialization and round-trip timing (see icmp.h).
+  ft_ping - ICMP Echo Request serialization, reply parsing and round-trip timing
+  (see icmp.h).
 */
 
 #include "icmp.h"
 
 #include <arpa/inet.h>
+#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/socket.h>
 
 #include "checksum.h"
 
@@ -43,6 +46,49 @@ size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_
   uint16_t cksum = htons(checksum(buf, ICMP_ECHO_HDRLEN + paylen));
   memcpy(buf + offsetof(t_icmp_echo, checksum), &cksum, sizeof cksum);
   return ICMP_ECHO_HDRLEN + paylen;
+}
+
+int icmp_parse_reply(const unsigned char *buf, size_t len, int socktype, uint16_t ident,
+                     t_reply *out) {
+  size_t off = 0;
+  int ttl = -1;
+
+  if (socktype == SOCK_RAW) {
+    struct ip iph;
+    if (len < sizeof iph) {
+      return -1;
+    }
+    memcpy(&iph, buf, sizeof iph);
+    off = (size_t)iph.ip_hl * 4;
+    ttl = iph.ip_ttl;
+  }
+  if (len < off + ICMP_ECHO_HDRLEN) {
+    return -1;
+  }
+  size_t icmplen = len - off;
+  if (checksum(buf + off, icmplen) != 0) {
+    return -1;
+  }
+  t_icmp_echo hdr;
+  memcpy(&hdr, buf + off, sizeof hdr);
+  if (hdr.type != ICMP_ECHOREPLY) {
+    return -1;
+  }
+  uint16_t id = ntohs(hdr.id);
+  if (socktype == SOCK_RAW && id != ident) {
+    return -1;
+  }
+  out->type = hdr.type;
+  out->ident = id;
+  out->seq = ntohs(hdr.seq);
+  out->ttl = ttl;
+  out->datalen = icmplen - ICMP_ECHO_HDRLEN;
+  out->have_ts = 0;
+  if (out->datalen >= sizeof(struct timeval)) {
+    memcpy(&out->tsend, buf + off + ICMP_ECHO_HDRLEN, sizeof out->tsend);
+    out->have_ts = 1;
+  }
+  return 0;
 }
 
 /* out = recv - sent, borrowing on the microseconds (inetutils' tvsub). */

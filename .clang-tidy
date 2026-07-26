@@ -7,7 +7,8 @@
 # misc-include-cleaner is kept ON for project headers (it enforces direct
 # includes, e.g. pulling in ft_ping.h/net.h) but told to ignore the low-level
 # system header families whose macros/enums live in non-includable inner headers
-# (asm-generic/socket.h for SOL_SOCKET, the netinet enums for IPPROTO_*, etc.).
+# (asm-generic/socket.h for SOL_SOCKET, the netinet enums for IPPROTO_*, and
+# sys/socket.h when only its SOCK_* constants are used, as icmp.c does).
 
 Checks: >
   bugprone-*,
@@ -26,4 +27,4 @@ WarningsAsErrors:   '*'
 HeaderFilterRegex:  '^(src|include)/.*\.h$'
 FormatStyle:        file
 CheckOptions:
-  misc-include-cleaner.IgnoreHeaders: 'asm/.*;asm-generic/.*;bits/.*;linux/.*;netinet/.*;arpa/.*'
+  misc-include-cleaner.IgnoreHeaders: 'asm/.*;asm-generic/.*;bits/.*;linux/.*;netinet/.*;arpa/.*;sys/socket\.h'
