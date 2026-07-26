@@ -26,11 +26,9 @@ typedef struct s_icmp_echo {
 } t_icmp_echo;
 _Static_assert(sizeof(t_icmp_echo) == ICMP_ECHO_HDRLEN, "ICMP echo header must be 8 bytes");
 
-size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
-                       const void *payload, size_t paylen) {
-  if (bufsz < ICMP_ECHO_HDRLEN || bufsz - ICMP_ECHO_HDRLEN < paylen) {
-    return 0;
-  }
+/* Write the header (checksum field 0) at buf[0..7] and the checksum over the
+   header plus paylen payload bytes. The payload must already be in place. */
+static void icmp_echo_finalize(unsigned char *buf, uint16_t ident, uint16_t seq, size_t paylen) {
   t_icmp_echo hdr = {
       .type = ICMP_ECHO,
       .code = 0,
@@ -39,13 +37,38 @@ size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_
       .seq = htons(seq),
   };
   memcpy(buf, &hdr, sizeof hdr);
+  uint16_t cksum = htons(checksum(buf, ICMP_ECHO_HDRLEN + paylen));
+  memcpy(buf + offsetof(t_icmp_echo, checksum), &cksum, sizeof cksum);
+}
+
+size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
+                       const void *payload, size_t paylen) {
+  if (bufsz < ICMP_ECHO_HDRLEN || bufsz - ICMP_ECHO_HDRLEN < paylen) {
+    return 0;
+  }
   if (paylen > 0) {
     memcpy(buf + ICMP_ECHO_HDRLEN, payload, paylen);
   }
-  /* Checksum last, over header (field = 0) plus payload; store big-endian. */
-  uint16_t cksum = htons(checksum(buf, ICMP_ECHO_HDRLEN + paylen));
-  memcpy(buf + offsetof(t_icmp_echo, checksum), &cksum, sizeof cksum);
+  icmp_echo_finalize(buf, ident, seq, paylen);
   return ICMP_ECHO_HDRLEN + paylen;
+}
+
+size_t icmp_echo_assemble(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
+                          const struct timeval *tsend, size_t datalen) {
+  if (bufsz < ICMP_ECHO_HDRLEN || bufsz - ICMP_ECHO_HDRLEN < datalen) {
+    return 0;
+  }
+  unsigned char *payload = buf + ICMP_ECHO_HDRLEN;
+  size_t off = 0;
+  if (datalen >= sizeof(struct timeval)) {
+    memcpy(payload, tsend, sizeof *tsend);
+    off = sizeof *tsend;
+  }
+  for (size_t i = off; i < datalen; i++) {
+    payload[i] = (unsigned char)(i - off);
+  }
+  icmp_echo_finalize(buf, ident, seq, datalen);
+  return ICMP_ECHO_HDRLEN + datalen;
 }
 
 int icmp_parse_reply(const unsigned char *buf, size_t len, int socktype, uint16_t ident,

@@ -1,8 +1,8 @@
 /*
   ft_ping - ICMP Echo Request serialization, reply parsing and round-trip timing.
 
-  Pure functions: no I/O, no clock, no state. icmp_echo_build writes an Echo
-  Request into a caller buffer; icmp_parse_reply validates a received reply;
+  Pure functions: no I/O, no clock, no state. icmp_echo_build/assemble write an
+  Echo Request into a caller buffer; icmp_parse_reply validates a received reply;
   icmp_rtt_ms turns two timestamps into a round-trip time in milliseconds.
 */
 
@@ -32,6 +32,13 @@ typedef struct s_reply {
    or 0 if bufsz is too small. */
 size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
                        const void *payload, size_t paylen);
+
+/* Assemble a complete outgoing Echo Request: the send timestamp at payload
+   offset 0 (when datalen >= sizeof(struct timeval)), then the default pattern,
+   then the header and checksum. tsend is a parameter (the clock stays in the
+   shell). Returns the total length, or 0 if bufsz is too small. */
+size_t icmp_echo_assemble(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
+                          const struct timeval *tsend, size_t datalen);
 
 /* Parse one received datagram. socktype governs: SOCK_RAW skips the IP header
    (ip_hl * 4) and filters by id; SOCK_DGRAM reads from offset 0 and does not

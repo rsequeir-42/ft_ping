@@ -1,7 +1,7 @@
 /*
   ft_ping - unit tests for the ICMP module.
 
-  Pure and deterministic: fixed inputs yield fixed bytes, so we assert the packet
+  Pure and deterministic: fixed inputs yield fixed bytes, so we assert packets
   byte for byte, parse hand-built replies, and compute RTTs from fixed timevals.
   No socket, no clock.
 */
@@ -16,7 +16,7 @@
 #include "checksum.h"
 #include "icmp.h"
 
-/* --- icmp_echo_build --- */
+/* --- icmp_echo_build (unchanged behaviour) --- */
 
 Test(icmp, echo_build_byte_exact) {
   unsigned char buf[12] = {0};
@@ -49,6 +49,54 @@ Test(icmp, echo_build_is_wire_checksummed) {
   const unsigned char pay[] = {0xDE, 0xAD, 0xBE, 0xEF};
   size_t n = icmp_echo_build(buf, sizeof buf, 0x1234, 0x0001, pay, sizeof pay);
   cr_assert_eq(checksum(buf, n), 0);
+}
+
+/* --- icmp_echo_assemble --- */
+
+Test(icmp, echo_assemble_byte_exact) {
+  unsigned char buf[64] = {0};
+  struct timeval tsend = {0}; /* zeros: endianness-independent bytes */
+  size_t n = icmp_echo_assemble(buf, sizeof buf, 0x1234, 0x0001, &tsend, 56);
+  cr_assert_eq(n, 64);
+  cr_assert_eq(buf[0], 0x08);
+  cr_assert_eq(buf[1], 0x00);
+  cr_assert_eq(buf[4], 0x12);
+  cr_assert_eq(buf[5], 0x34);
+  cr_assert_eq(buf[6], 0x00);
+  cr_assert_eq(buf[7], 0x01);
+  for (size_t i = 0; i < 16; i++) {
+    cr_assert_eq(buf[8 + i], 0x00, "timeval byte %zu", i);
+  }
+  for (size_t i = 0; i < 40; i++) {
+    cr_assert_eq(buf[24 + i], (unsigned char)i, "pattern byte %zu", i);
+  }
+  cr_assert_eq(checksum(buf, n), 0);
+}
+
+Test(icmp, echo_assemble_carries_the_timestamp) {
+  unsigned char buf[64] = {0};
+  struct timeval tsend = {.tv_sec = 0x11223344, .tv_usec = 0x55667788};
+  size_t n = icmp_echo_assemble(buf, sizeof buf, 0xABCD, 0x0007, &tsend, 56);
+  cr_assert_eq(n, 64);
+  cr_assert_eq(memcmp(buf + 8, &tsend, sizeof tsend), 0); /* host order, whatever it is */
+  cr_assert_eq(checksum(buf, n), 0);
+}
+
+Test(icmp, echo_assemble_small_payload_has_no_timestamp) {
+  unsigned char buf[16] = {0};
+  struct timeval tsend = {.tv_sec = 1, .tv_usec = 2};
+  size_t n = icmp_echo_assemble(buf, sizeof buf, 1, 1, &tsend, 8);
+  cr_assert_eq(n, 16);
+  for (size_t i = 0; i < 8; i++) {
+    cr_assert_eq(buf[8 + i], (unsigned char)i); /* pattern from 0, no timeval */
+  }
+  cr_assert_eq(checksum(buf, n), 0);
+}
+
+Test(icmp, echo_assemble_buffer_too_small) {
+  unsigned char buf[8] = {0};
+  struct timeval tsend = {0};
+  cr_assert_eq(icmp_echo_assemble(buf, sizeof buf, 1, 1, &tsend, 56), 0);
 }
 
 /* --- icmp_parse_reply --- */
