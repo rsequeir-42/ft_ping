@@ -6,8 +6,11 @@
 
 #include <arpa/inet.h>
 #include <netinet/ip_icmp.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
+#include "checksum.h"
 
 /* Wire layout of the 8-byte Echo header. The _Static_assert guarantees no
    padding, so a memcpy of this struct reproduces the on-wire bytes exactly. */
@@ -36,5 +39,8 @@ size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_
   if (paylen > 0) {
     memcpy(buf + ICMP_ECHO_HDRLEN, payload, paylen);
   }
+  /* Checksum last, over header (field = 0) plus payload; store big-endian. */
+  uint16_t cksum = htons(checksum(buf, ICMP_ECHO_HDRLEN + paylen));
+  memcpy(buf + offsetof(t_icmp_echo, checksum), &cksum, sizeof cksum);
   return ICMP_ECHO_HDRLEN + paylen;
 }
