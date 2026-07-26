@@ -2,13 +2,15 @@
   ft_ping - unit tests for the ICMP socket module.
 
   The pure helpers (icmp_ident, net_socket_error) are deterministic everywhere.
-  net_open depends on privilege, so it is checked by CONTRACT (either a valid fd
-  with a known socktype, or -1 with a privilege errno) so it passes with or
-  without CAP_NET_RAW.
+  net_open depends on privilege, so it is checked by CONTRACT. net_send/net_recv
+  are protocol-agnostic transport, exercised over an unprivileged UDP loopback.
 */
 
+#include <arpa/inet.h>
 #include <criterion/criterion.h>
 #include <errno.h>
+#include <netinet/in.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -41,4 +43,47 @@ Test(net, open_honours_its_contract) {
     cr_assert(st == SOCK_RAW || st == SOCK_DGRAM);
     close(fd);
   }
+}
+
+/* Bind a UDP socket to an ephemeral port on 127.0.0.1; return fd, write addr. */
+static int udp_bind_local(struct sockaddr_in *addr) {
+  int fd = socket(AF_INET, SOCK_DGRAM, 0);
+  cr_assert_geq(fd, 0);
+  memset(addr, 0, sizeof *addr);
+  addr->sin_family = AF_INET;
+  addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  addr->sin_port = 0;
+  cr_assert_eq(bind(fd, (const struct sockaddr *)addr, sizeof *addr), 0);
+  socklen_t sl = sizeof *addr;
+  cr_assert_eq(getsockname(fd, (struct sockaddr *)addr, &sl), 0);
+  return fd;
+}
+
+Test(net, send_then_recv_roundtrips_bytes) {
+  struct sockaddr_in raddr;
+  int rx = udp_bind_local(&raddr);
+  int tx = socket(AF_INET, SOCK_DGRAM, 0);
+  cr_assert_geq(tx, 0);
+
+  const unsigned char msg[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x2A};
+  cr_assert_eq(net_send(tx, msg, sizeof msg, &raddr), (ssize_t)sizeof msg);
+
+  unsigned char buf[64] = {0};
+  ssize_t n = net_recv(rx, buf, sizeof buf, 1000);
+  cr_assert_eq(n, (ssize_t)sizeof msg);
+  cr_assert_arr_eq(buf, msg, sizeof msg);
+
+  close(tx);
+  close(rx);
+}
+
+Test(net, recv_times_out_when_silent) {
+  struct sockaddr_in raddr;
+  int rx = udp_bind_local(&raddr);
+
+  unsigned char buf[64];
+  ssize_t n = net_recv(rx, buf, sizeof buf, 50); /* nothing sent */
+  cr_assert_eq(n, 0);
+
+  close(rx);
 }
