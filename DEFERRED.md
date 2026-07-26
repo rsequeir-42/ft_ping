@@ -38,10 +38,10 @@ Entry format:
 
 ### DD-005 - Property-based testing
 - Status: open
-- Date: 2026-06-03
-- Current choice: Criterion theories cover chosen vectors; no generative PBT.
-- Why temporary: the pure functions to fuzz with properties (checksum, stats) do not exist yet.
-- Review trigger: the `checksum`/`stats` modules. Planned shape: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 algebraic invariants and "never crashes on arbitrary input".
+- Date: 2026-06-03 (checksum reached 2026-07-26)
+- Current choice: `checksum` is covered by vectors verified against RFC 1071 and scapy, plus the `recompute == 0` property and edge cases -- 100% covered. No generative PBT.
+- Why temporary: `theft` (vendored) plus a separate `test_pbt` binary is a fixed setup cost, not justified for a single pure function already exhaustively covered by verified vectors.
+- Review trigger: the `stats` sprint, which adds a second pure function with algebraic invariants (min/avg/max/stddev). Reassess then whether `theft` amortizes across `checksum` + `stats`. Planned shape unchanged: theft (vendored), a separate `test_pbt` binary, properties such as RFC 1071 invariants and "never crashes on arbitrary input".
 
 ### DD-007 - trixie runs only the check job
 - Status: open
