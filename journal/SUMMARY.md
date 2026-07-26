@@ -32,3 +32,4 @@
 - [Traduire un nom, et s'arrêter là](target-resolution.md)
 - [Ouvrir une porte gardée](raw-socket.md)
 - [Écrire un paquet à la main](icmp-packet.md)
+- [Une somme contre le bruit](checksum.md)
