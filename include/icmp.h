@@ -1,8 +1,9 @@
 /*
-  ft_ping - ICMP Echo Request serialization.
+  ft_ping - ICMP Echo Request serialization and round-trip timing.
 
-  icmp_echo_build() writes an Echo Request header and copies an opaque payload
-  into a caller-provided buffer. Pure: no I/O, no clock, no state.
+  Pure functions: no I/O, no clock, no state. icmp_echo_build writes an Echo
+  Request into a caller buffer; icmp_rtt_ms turns two timestamps into a
+  round-trip time in milliseconds.
 */
 
 #ifndef ICMP_H
@@ -10,6 +11,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 #define ICMP_ECHO_HDRLEN 8 /* type + code + checksum + id + seq */
 
@@ -19,5 +21,8 @@
    or 0 if bufsz is too small. */
 size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_t seq,
                        const void *payload, size_t paylen);
+
+/* Round-trip time in milliseconds between the send and receive timestamps. */
+double icmp_rtt_ms(const struct timeval *sent, const struct timeval *recv);
 
 #endif /* ICMP_H */

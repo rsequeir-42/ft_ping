@@ -1,5 +1,5 @@
 /*
-  ft_ping - ICMP Echo Request serialization (see icmp.h).
+  ft_ping - ICMP Echo Request serialization and round-trip timing (see icmp.h).
 */
 
 #include "icmp.h"
@@ -43,4 +43,23 @@ size_t icmp_echo_build(unsigned char *buf, size_t bufsz, uint16_t ident, uint16_
   uint16_t cksum = htons(checksum(buf, ICMP_ECHO_HDRLEN + paylen));
   memcpy(buf + offsetof(t_icmp_echo, checksum), &cksum, sizeof cksum);
   return ICMP_ECHO_HDRLEN + paylen;
+}
+
+/* out = recv - sent, borrowing on the microseconds (inetutils' tvsub). */
+static struct timeval tv_sub(const struct timeval *recv, const struct timeval *sent) {
+  struct timeval out = *recv;
+
+  out.tv_usec -= sent->tv_usec;
+  if (out.tv_usec < 0) {
+    out.tv_sec -= 1;
+    out.tv_usec += 1000000;
+  }
+  out.tv_sec -= sent->tv_sec;
+  return out;
+}
+
+double icmp_rtt_ms(const struct timeval *sent, const struct timeval *recv) {
+  struct timeval d = tv_sub(recv, sent);
+
+  return ((double)d.tv_sec * 1000.0) + ((double)d.tv_usec / 1000.0);
 }
