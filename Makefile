@@ -7,7 +7,7 @@ SRCDIR		:= src
 INCDIR		:= include
 
 # Sources listed explicitly (no wildcard: an unlisted file is a deliberate signal).
-SRC			:= main.c options.c error.c target.c net.c icmp.c
+SRC			:= main.c options.c error.c target.c net.c icmp.c checksum.c
 
 # Build profile: release (default), debug or coverage. Use: make MODE=debug
 MODE		?= release
